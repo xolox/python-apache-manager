@@ -1,0 +1,14 @@
+#!/bin/bash -e
+
+cat >&2 << EOF
+
+  To collect full coverage statistics the 'apache-manager' test suite needs to
+  be run with super user privileges, so you will be asked to provide your sudo
+  password. Please make sure you don't run this on production web servers
+  because the test suite involves the killing of Apache workers that exceed
+  resource usage thresholds.
+
+EOF
+
+sudo $(which coverage) run setup.py test
+coverage report --fail-under=90
