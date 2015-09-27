@@ -1,13 +1,13 @@
 # Monitor and control Apache web server workers from Python.
 #
 # Author: Peter Odding <peter@peterodding.com>
-# Last Change: September 26, 2015
+# Last Change: September 27, 2015
 # URL: https://apache-manager.readthedocs.org
 
 """The :mod:`apache_manager` module defines the core logic of the Apache manager."""
 
 # Semi-standard module versioning.
-__version__ = '0.1'
+__version__ = '0.1.1'
 
 # Hide internal identifiers from API documentation.
 __all__ = (
@@ -286,7 +286,7 @@ class ApacheManager(object):
                   you want to get a fresh value see :func:`refresh()`.
         """
         # Use BeautifulSoup to parse the HTML response body.
-        soup = BeautifulSoup(self.html_status)
+        soup = BeautifulSoup(self.html_status, "html.parser")
         # Prepare a list of normalized column headings expected to be defined in the table.
         required_columns = [normalize_text(c) for c in STATUS_COLUMNS]
         # Check each table on the Apache status page, because different
