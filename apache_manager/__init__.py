@@ -1,13 +1,13 @@
 # Monitor and control Apache web server workers from Python.
 #
 # Author: Peter Odding <peter@peterodding.com>
-# Last Change: September 27, 2015
+# Last Change: October 4, 2015
 # URL: https://apache-manager.readthedocs.org
 
 """The :mod:`apache_manager` module defines the core logic of the Apache manager."""
 
 # Semi-standard module versioning.
-__version__ = '0.1.1'
+__version__ = '0.2'
 
 # Hide internal identifiers from API documentation.
 __all__ = (
@@ -27,10 +27,10 @@ import re
 
 # External dependencies.
 from bs4 import BeautifulSoup
-from cached_property import cached_property
 from humanfriendly import compact, format_size, format_timespan, pluralize, Timer
 from proc.apache import find_apache_memory_usage, find_apache_workers
 from proc.core import Process
+from property_manager import PropertyManager, cached_property, lazy_property, mutable_property, writable_property
 
 # Modules included in our package.
 from apache_manager.exceptions import PortDiscoveryError, StatusPageError
@@ -39,7 +39,9 @@ from apache_manager.compat import HTTPError, urlopen
 PORTS_CONF = '/etc/apache2/ports.conf'
 """
 The absolute pathname of the configuration file that defines the port(s) that
-Apache listens on (a string).
+Apache listens on (a string). This constant is used as a default value for
+:attr:`~ApacheManager.ports_config`. It's based on Debian's Apache 2
+packaging.
 """
 
 STATUS_COLUMNS = (
@@ -61,42 +63,57 @@ Worker modes that are considered idle (a tuple of strings). Refer to
 logger = logging.getLogger(__name__)
 
 
-class ApacheManager(object):
+class ApacheManager(PropertyManager):
 
     """
     Apache web server manager.
 
-    .. attribute:: num_killed_active
-
-       The number of active Apache workers killed by :func:`kill_workers()` (an
-       integer).
-
-    .. attribute:: num_killed_idle
-
-       The number of idle Apache workers killed by :func:`kill_workers()` (an
-       integer).
-
-    .. attribute:: status_response
-
-       Whether the Apache status page was fetched successfully by
-       :attr:`html_status` (a boolean). This will be :data:`None` as long as
-       :attr:`html_status` hasn't been used.
+    Most of the computed properties on this class are cached to avoid repeated
+    expensive computations (refer to :class:`~property_manager.cached_property`
+    for details). The easiest way to invalidate all of these cached properties
+    at once is to call the :func:`refresh()` method.
     """
 
-    def __init__(self, ports_config=PORTS_CONF):
+    def __init__(self, *args, **kw):
         """
-        Construct an :class:`ApacheManager` object.
+        Initialize a :class:`ApacheManager` object.
 
-        :param ports_config: The location of the ``ports.conf`` configuration
-                             file (a string). The default value is based on
-                             Debian's Apache 2 packaging.
+        :param args: The first positional argument is used to set
+                     :attr:`ports_config`.
         """
-        # Store constructor arguments.
-        self.ports_config = ports_config
-        # Initialize instance variables.
-        self.num_killed_active = 0
-        self.num_killed_idle = 0
-        self.status_response = None
+        if args:
+            args = list(args)
+            kw['ports_config'] = args.pop(0)
+        super(ApacheManager, self).__init__(*args, **kw)
+
+    @writable_property
+    def num_killed_active(self):
+        """The number of active workers killed by :func:`kill_workers()` (an integer)."""
+        return 0
+
+    @writable_property
+    def num_killed_idle(self):
+        """The number of idle workers killed by :func:`kill_workers()` (an integer)."""
+        return 0
+
+    @writable_property
+    def status_response(self):
+        """
+        Whether the status page was fetched successfully by :func:`fetch_status_page()` (a boolean).
+
+        This will be :data:`None` as long as :attr:`fetch_status_page` hasn't been called.
+        """
+        return None
+
+    @mutable_property
+    def ports_config(self):
+        """
+        The absolute pathname of the ``ports.conf`` configuration file (a string).
+
+        The configuration file is expected to define the port(s) that Apache
+        listens on. Defaults to :data:`PORTS_CONF`.
+        """
+        return PORTS_CONF
 
     @cached_property
     def listen_ports(self):
@@ -113,9 +130,6 @@ class ApacheManager(object):
         >>> manager = ApacheManager()
         >>> manager.listen_ports
         [80, 443]
-
-        .. note:: This property's value is computed on demand and cached. If
-                  you want to get a fresh value see :func:`refresh()`.
         """
         logger.debug("Discovering Apache ports by parsing %s ..", self.ports_config)
         # Make sure the configuration file exists.
@@ -160,9 +174,6 @@ class ApacheManager(object):
         >>> manager = ApacheManager()
         >>> manager.status_url
         'http://127.0.0.1:80/server-status'
-
-        .. note:: This property's value is computed on demand and cached. If
-                  you want to get a fresh value see :func:`refresh()`.
         """
         port_number = self.listen_ports[0]
         url_scheme = 'https' if port_number == 443 else 'http'
@@ -183,9 +194,6 @@ class ApacheManager(object):
         >>> manager = ApacheManager()
         >>> manager.status_url
         'http://127.0.0.1:80/server-status?auto'
-
-        .. note:: This property's value is computed on demand and cached. If
-                  you want to get a fresh value see :func:`refresh()`.
         """
         status_url = "%s?auto" % self.html_status_url
         logger.debug("Discovered Apache plain text status page URL: %s", status_url)
@@ -197,9 +205,6 @@ class ApacheManager(object):
         The content of Apache's `HTML status page`_ (a string). See also :attr:`text_status`.
 
         :raises: Any exceptions raised by :func:`fetch_status_page()`.
-
-        .. note:: This property's value is computed on demand and cached. If
-                  you want to get a fresh value see :func:`refresh()`.
 
         .. _HTML status page: http://httpd.apache.org/docs/trunk/mod/mod_status.html
         """
@@ -227,9 +232,6 @@ class ApacheManager(object):
         BusyWorkers: 1
         IdleWorkers: 5
         Scoreboard: ____W._.......................................
-
-        .. note:: This property's value is computed on demand and cached. If
-                  you want to get a fresh value see :func:`refresh()`.
 
         .. _plain text status page: http://httpd.apache.org/docs/trunk/mod/mod_status.html#machinereadable
         """
@@ -281,9 +283,6 @@ class ApacheManager(object):
         like :attr`WorkerStatus.pid` because they describe an "empty slot".
         See the :attr:`workers` property for a list of :class:`WorkerStatus`
         objects without empty slots.
-
-        .. note:: This property's value is computed on demand and cached. If
-                  you want to get a fresh value see :func:`refresh()`.
         """
         # Use BeautifulSoup to parse the HTML response body.
         soup = BeautifulSoup(self.html_status, "html.parser")
@@ -319,9 +318,6 @@ class ApacheManager(object):
         This property's value is based on :attr:`slots` but excludes empty
         slots (i.e. every :class:`WorkerStatus` object in :attr:`workers` will
         have expected properties like :attr`WorkerStatus.pid`).
-
-        .. note:: This property's value is computed on demand and cached. If
-                  you want to get a fresh value see :func:`refresh()`.
         """
         return [ws for ws in self.slots if ws.m != '.']
 
@@ -382,9 +378,6 @@ class ApacheManager(object):
          'total_accesses': 85,
          'total_traffic': 259,
          'uptime': 174303}
-
-        .. note:: This property's value is computed on demand and cached. If
-                  you want to get a fresh value see :func:`refresh()`.
         """
         logger.debug("Extracting metrics from Apache's plain text status page ..")
         return dict(
@@ -453,9 +446,6 @@ class ApacheManager(object):
         141787428.571
         >>> print(manager.memory_usage.max)
         735391744
-
-        .. note:: This property's value is computed on demand and cached. If
-                  you want to get a fresh value see :func:`refresh()`.
         """
         return self.combined_memory_usage[0]
 
@@ -479,9 +469,6 @@ class ApacheManager(object):
         {'group-one': [44048384, 44724224, 44048384],
          'group-two': [52088832, 51879936, 55554048, 54956032, 54968320],
          'other-group': [13697024, 13697024, 13697024, 13697024]}
-
-        .. note:: This property's value is computed on demand and cached. If
-                  you want to get a fresh value see :func:`refresh()`.
         """
         return self.combined_memory_usage[1]
 
@@ -609,9 +596,7 @@ class ApacheManager(object):
 
     def refresh(self):
         """Clear cached properties so that their values are recomputed when dereferenced."""
-        for name, value in self.__class__.__dict__.items():
-            if hasattr(self, name) and isinstance(value, cached_property):
-                delattr(self, name)
+        self.clear_cached_properties()
 
 
 class KillableWorker(object):
@@ -628,7 +613,7 @@ class KillableWorker(object):
         """:data:`True` if :attr:`pid` refers to an existing process, :data:`False` otherwise."""
         return self.process.is_alive if self.process else False
 
-    @cached_property
+    @lazy_property(writable=True)
     def process(self):
         """
         The :class:`proc.core.Process` object for this :attr:`pid`.
@@ -639,7 +624,7 @@ class KillableWorker(object):
         if self.pid:
             return Process.from_pid(self.pid)
 
-    @property
+    @lazy_property
     def memory_usage(self):
         """
         The memory usage of the worker process in bytes.

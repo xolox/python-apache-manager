@@ -3,7 +3,7 @@
 """Setup script for the `apache-manager` package."""
 
 # Author: Peter Odding <peter@peterodding.com>
-# Last Change: September 26, 2015
+# Last Change: October 4, 2015
 # URL: https://apache-manager.readthedocs.org
 
 # Standard library modules.
@@ -45,10 +45,10 @@ setup(
     test_suite='apache_manager.tests',
     install_requires=[
         'beautifulsoup4 >= 4.3.2',
-        'cached-property >= 1.2.0',
         'coloredlogs >= 1.0.1',
         'humanfriendly >= 1.31',
         'proc >= 0.2.2',
+        'property-manager >= 1.0.1',
     ],
     tests_require=[
         'capturer >= 2.1',
