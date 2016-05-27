@@ -13,23 +13,31 @@ import re
 
 # External dependencies.
 from bs4 import BeautifulSoup
-from humanfriendly import compact, format_size, format_timespan, pluralize, Timer
+from humanfriendly import compact, concatenate, format_size, format_timespan, pluralize, Timer
 from proc.apache import find_apache_memory_usage, find_apache_workers
 from proc.core import Process
-from property_manager import PropertyManager, cached_property, lazy_property, mutable_property, writable_property
+from property_manager import (
+    PropertyManager,
+    cached_property,
+    lazy_property,
+    mutable_property,
+    required_property,
+    writable_property,
+)
 
 # Modules included in our package.
-from apache_manager.exceptions import PortDiscoveryError, StatusPageError
+from apache_manager.exceptions import AddressDiscoveryError, StatusPageError
 from apache_manager.compat import HTTPError, urlopen
 
 # Semi-standard module versioning.
-__version__ = '0.2'
+__version__ = '0.3'
 
 # Hide internal identifiers from API documentation.
 __all__ = (
     'ApacheManager',
     'IDLE_MODES',
     'KillableWorker',
+    'NetworkAddress',
     'NonNativeWorker',
     'PORTS_CONF',
     'STATUS_COLUMNS',
@@ -116,57 +124,93 @@ class ApacheManager(PropertyManager):
         return PORTS_CONF
 
     @cached_property
-    def listen_ports(self):
+    def listen_addresses(self):
         """
-        Port(s) on which Apache is configured to be listening (a sorted list of integers).
+        The network address(es) where Apache is listening (a list of :class:`NetworkAddress` objects).
 
-        :raises: :exc:`.PortDiscoveryError` when port discovery fails (e.g.
-                 because ``/etc/apache2/ports.conf`` is missing or can't be
-                 parsed).
+        :raises: :exc:`.AddressDiscoveryError` when discovery fails (e.g. because
+                 ``/etc/apache2/ports.conf`` is missing or can't be parsed).
 
         Here's an example:
 
         >>> from apache_manager import ApacheManager
         >>> manager = ApacheManager()
-        >>> manager.listen_ports
-        [80, 443]
+        >>> manager.listen_addresses
+        [NetworkAddress(protocol='http',
+                        address='127.0.0.1',
+                        port=81,
+                        url='http://127.0.0.1:81')]
         """
-        logger.debug("Discovering Apache ports by parsing %s ..", self.ports_config)
+        logger.debug("Discovering where Apache is listening by parsing %s ..", self.ports_config)
         # Make sure the configuration file exists.
         if not os.path.isfile(self.ports_config):
-            raise PortDiscoveryError(compact("""
-                Failed to discover port(s) that Apache is listening on! The
-                configuration file {filename} is missing. Are you sure the Apache
-                web server is properly installed? If so you'll have to specify the
-                location of the configuration file.
+            raise AddressDiscoveryError(compact("""
+                Failed to discover any addresses or ports that Apache is
+                listening on! The configuration file {filename} is missing. Are
+                you sure the Apache web server is properly installed? If so
+                you'll have to specify the configuration's location.
             """, filename=self.ports_config))
         # Parse the configuration file.
-        matched_ports = []
+        matched_addresses = []
+        pattern = re.compile(r'^(.+):(\d+)$')
         with open(self.ports_config) as handle:
             for lnum, line in enumerate(handle, start=1):
                 tokens = line.split()
-                if len(tokens) >= 2 and tokens[0] == 'Listen' and tokens[1].isdigit():
-                    port_number = int(tokens[1])
-                    if port_number not in matched_ports:
-                        logger.debug("Found port number %i on line %i.", port_number, lnum)
-                        matched_ports.append(port_number)
+                # We are looking for `Listen' directives.
+                if len(tokens) >= 2 and tokens[0] == 'Listen':
+                    parsed_value = None
+                    # Check for a port number without an IP address.
+                    if tokens[1].isdigit():
+                        parsed_value = NetworkAddress(port=int(tokens[1]))
+                    else:
+                        # Check for an IP address with a port number.
+                        match = pattern.match(tokens[1])
+                        if match:
+                            address = match.group(1)
+                            port = int(match.group(2))
+                            if address == '0.0.0.0':
+                                address = '127.0.0.1'
+                            parsed_value = NetworkAddress(address=address, port=port)
+                    # Check if we have a match.
+                    if parsed_value is not None:
+                        # Override the protocol if necessary.
+                        if len(tokens) >= 3:
+                            parsed_value.protocol = tokens[2]
+                        logger.debug("Parsed listen directive on line %i: %s", lnum, parsed_value)
+                        matched_addresses.append(parsed_value)
+                    else:
+                        logger.warning("Failed to parse listen directive on line %i: %s", lnum, line)
         # Sanity check the results.
-        if not matched_ports:
-            raise PortDiscoveryError(compact("""
-                Failed to discover port(s) that Apache is listening on! Maybe I'm
-                parsing the wrong configuration file? ({filename})
+        if not matched_addresses:
+            raise AddressDiscoveryError(compact("""
+                Failed to discover any addresses or ports that Apache is
+                listening on! Maybe I'm parsing the wrong configuration file?
+                ({filename})
             """, filename=self.ports_config))
         # Log and return sorted port numbers.
-        sorted_ports = sorted(matched_ports)
-        logger.debug("Discovered %s: %s", pluralize(len(sorted_ports), "Apache port"), sorted_ports)
-        return sorted_ports
+        logger.debug("Discovered %s that Apache is listening on: %s",
+                     pluralize(len(matched_addresses), "address", "addresses"),
+                     concatenate(map(str, matched_addresses)))
+        return matched_addresses
+
+    @cached_property
+    def listen_ports(self):
+        """
+        Port(s) on which Apache is configured to be listening (a sorted list of integers).
+
+        :raises: Any exceptions raised by :attr:`listen_addresses`.
+
+        This property is deprecated because :attr:`listen_addresses` should
+        be used instead. It remains only for backwards compatibility.
+        """
+        return sorted(a.port for a in self.listen_addresses if a.address == '127.0.0.1')
 
     @cached_property
     def html_status_url(self):
         """
         The URL on which Apache's HTML status page can be retrieved (a string).
 
-        :raises: Any exceptions raised by :attr:`listen_ports`.
+        :raises: Any exceptions raised by :attr:`listen_addresses`.
 
         Here's an example:
 
@@ -175,9 +219,7 @@ class ApacheManager(PropertyManager):
         >>> manager.status_url
         'http://127.0.0.1:80/server-status'
         """
-        port_number = self.listen_ports[0]
-        url_scheme = 'https' if port_number == 443 else 'http'
-        status_url = "%s://127.0.0.1:%i/server-status" % (url_scheme, port_number)
+        status_url = "%s/server-status" % self.listen_addresses[0].url
         logger.debug("Discovered Apache HTML status page URL: %s", status_url)
         return status_url
 
@@ -186,7 +228,7 @@ class ApacheManager(PropertyManager):
         """
         The URL on which Apache's plain text status page can be retrieved (a string).
 
-        :raises: Any exceptions raised by :attr:`listen_ports`.
+        :raises: Any exceptions raised by :attr:`listen_addresses`.
 
         Here's an example:
 
@@ -597,6 +639,38 @@ class ApacheManager(PropertyManager):
     def refresh(self):
         """Clear cached properties so that their values are recomputed when dereferenced."""
         self.clear_cached_properties()
+
+
+class NetworkAddress(PropertyManager):
+
+    """Network address objects encapsulate everything we need to know to connect to Apache."""
+
+    @property
+    def url(self):
+        """The URL corresponding to :attr:`protocol`, :attr:`address` and :attr:`port` (a string)."""
+        tokens = [self.protocol, '://', self.address]
+        if not ((self.protocol == 'http' and self.port == 80) or
+                (self.protocol == 'https' and self.port == 443)):
+            tokens.append(':%s' % self.port)
+        return ''.join(tokens)
+
+    @required_property
+    def protocol(self):
+        """The protocol that Apache is listening for (one of the strings 'http' or 'https')."""
+        return 'https' if self.port == 443 else 'http'
+
+    @required_property
+    def address(self):
+        """The IP address on which Apache is listening (a string)."""
+        return '127.0.0.1'
+
+    @required_property
+    def port(self):
+        """The port number on which Apache is listening (an integer)."""
+
+    def __str__(self):
+        """Use :attr:`url` for a human friendly representation."""
+        return self.url
 
 
 class KillableWorker(object):

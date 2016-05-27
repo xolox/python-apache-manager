@@ -1,7 +1,7 @@
 # Monitor and control Apache web server workers from Python.
 #
 # Author: Peter Odding <peter@peterodding.com>
-# Last Change: September 26, 2015
+# Last Change: May 27, 2016
 # URL: https://apache-manager.readthedocs.org
 
 """Test suite for the `apache-manager` project."""
@@ -25,7 +25,7 @@ from humanfriendly import compact, dedent
 from apache_manager import ApacheManager
 from apache_manager.cli import main
 from apache_manager.compat import Request, urlopen
-from apache_manager.exceptions import PortDiscoveryError, StatusPageError
+from apache_manager.exceptions import AddressDiscoveryError, StatusPageError
 
 # Initialize a logger for this module.
 logger = logging.getLogger(__name__)
@@ -45,12 +45,13 @@ def setUpModule():
     this is required to run the test suite.
     """
     # Set up logging to the terminal.
-    coloredlogs.install()
+    coloredlogs.install(level=logging.DEBUG)
     # Make sure Apache is installed and configured.
     try:
         manager = ApacheManager()
         manager.fetch_status_page(manager.text_status_url)
     except Exception as e:
+        logger.exception("Failed to connect to local Apache server!")
         raise Exception(compact("""
             Please make sure the Apache web server is installed and configured
             (running) before you run this test suite because this test suite
@@ -74,14 +75,13 @@ class ApacheManagerTestCase(unittest.TestCase):
         # Test that port discovery raises an exception when ports.conf doesn't exist.
         config_file = 'this-ports-config-does-not-exist-%i.conf' % os.getpid()
         manager = ApacheManager(os.path.join(tempfile.gettempdir(), config_file))
-        self.assertRaises(PortDiscoveryError, lambda: manager.listen_ports)
+        self.assertRaises(AddressDiscoveryError, lambda: manager.listen_addresses)
         # Test that port discovery raises an exception when parsing of ports.conf fails.
         with tempfile.NamedTemporaryFile() as temporary_file:
             manager = ApacheManager(temporary_file.name)
-            self.assertRaises(PortDiscoveryError, lambda: manager.listen_ports)
+            self.assertRaises(AddressDiscoveryError, lambda: manager.listen_addresses)
         # Test that port discovery returns at least one port.
-        manager = ApacheManager()
-        assert len(manager.listen_ports) >= 1
+        assert len(ApacheManager().listen_addresses) >= 1
 
     def test_text_status_page(self):
         """Test that the plain text status page can be fetched."""
@@ -163,9 +163,9 @@ class ApacheManagerTestCase(unittest.TestCase):
         try:
             manager = ApacheManager()
             manager.save_metrics(temporary_file)
-            lines = [line.split() for line in open(temporary_file)]
-            metric_names = [l[0] for l in lines]
-            assert sorted(metric_names) == sorted([
+            with open(temporary_file) as handle:
+                keywords = [tokens[0] for tokens in (line.split() for line in handle) if tokens]
+            assert all(required_kw in keywords for required_kw in [
                 'busy-workers',
                 'bytes-per-request',
                 'bytes-per-second',
@@ -363,6 +363,7 @@ class TemporaryWSGIApp(object):
 
         :param name: The name of the WSGI application (a string).
         """
+        self.manager = ApacheManager()
         self.name = 'apache-manager-%s' % name
 
     def install_wsgi_app(self, python_code, *args, **kw):
@@ -379,12 +380,13 @@ class TemporaryWSGIApp(object):
             handle.write('%s\n' % dedent(python_code, *args, **kw))
         logger.info("Creating Apache virtual host: %s", self.virtual_host_file)
         with open(self.virtual_host_file, 'w') as handle:
+            netloc = self.manager.listen_addresses[0]
             handle.write(dedent('''
-                <VirtualHost *:80>
+                <VirtualHost {netloc.address}:{netloc.port}>
                     ServerName {server_name}
                     WSGIScriptAlias / {wsgi_script}
                 </VirtualHost>
-            ''', server_name=self.name, wsgi_script=self.wsgi_script_file))
+            ''', netloc=netloc, server_name=self.name, wsgi_script=self.wsgi_script_file))
         logger.info("Activating Apache virtual host ..")
         assert os.system('sudo service apache2 reload') == 0
 
@@ -406,12 +408,12 @@ class TemporaryWSGIApp(object):
 
     def make_request_helper(self, started_event):
         """Helper method to make a request to the WSGI application in a subprocess."""
-        # Let the parent process know we're ready to make the HTTP request.
-        started_event.set()
         # Let the operator know that we're about to make the HTTP request.
         logger.info("Making HTTP request to %s virtual host ..", self.name)
+        # Let the parent process know we're ready to make the HTTP request.
+        started_event.set()
         # Finally here's everything we wanted to do: It's a one liner :-P.
-        urlopen(Request('http://127.0.0.1', None, dict(Host=self.name))).read()
+        urlopen(Request(self.manager.listen_addresses[0].url, None, dict(Host=self.name))).read()
 
     @property
     def virtual_host_file(self):

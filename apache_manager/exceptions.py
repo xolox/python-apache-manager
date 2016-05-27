@@ -1,7 +1,7 @@
 # Monitor and control Apache web server workers from Python.
 #
 # Author: Peter Odding <peter@peterodding.com>
-# Last Change: September 26, 2015
+# Last Change: May 27, 2016
 # URL: https://apache-manager.readthedocs.org
 
 """
@@ -17,9 +17,9 @@ class ApacheManagerError(Exception):
     """Base exception for custom exceptions raised by :mod:`apache_manager`."""
 
 
-class PortDiscoveryError(ApacheManagerError):
+class AddressDiscoveryError(ApacheManagerError):
 
-    """Raised by :attr:`.ApacheManager.listen_ports` when port discovery fails."""
+    """Raised by :attr:`.ApacheManager.listen_addresses` when port discovery fails."""
 
 
 class StatusPageError(ApacheManagerError):
