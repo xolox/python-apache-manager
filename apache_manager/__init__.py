@@ -1,24 +1,10 @@
 # Monitor and control Apache web server workers from Python.
 #
 # Author: Peter Odding <peter@peterodding.com>
-# Last Change: October 4, 2015
+# Last Change: May 27, 2016
 # URL: https://apache-manager.readthedocs.org
 
 """The :mod:`apache_manager` module defines the core logic of the Apache manager."""
-
-# Semi-standard module versioning.
-__version__ = '0.2'
-
-# Hide internal identifiers from API documentation.
-__all__ = (
-    'ApacheManager',
-    'IDLE_MODES',
-    'KillableWorker',
-    'NonNativeWorker',
-    'PORTS_CONF',
-    'STATUS_COLUMNS',
-    'WorkerStatus',
-)
 
 # Standard library modules.
 import logging
@@ -35,6 +21,20 @@ from property_manager import PropertyManager, cached_property, lazy_property, mu
 # Modules included in our package.
 from apache_manager.exceptions import PortDiscoveryError, StatusPageError
 from apache_manager.compat import HTTPError, urlopen
+
+# Semi-standard module versioning.
+__version__ = '0.2'
+
+# Hide internal identifiers from API documentation.
+__all__ = (
+    'ApacheManager',
+    'IDLE_MODES',
+    'KillableWorker',
+    'NonNativeWorker',
+    'PORTS_CONF',
+    'STATUS_COLUMNS',
+    'WorkerStatus',
+)
 
 PORTS_CONF = '/etc/apache2/ports.conf'
 """

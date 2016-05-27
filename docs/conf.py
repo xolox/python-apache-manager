@@ -40,7 +40,7 @@ copyright = u'2015, Peter Odding'
 # built documents.
 
 # Find the package version and make it the release.
-from apache_manager import __version__ as apache_manager_version
+from apache_manager import __version__ as apache_manager_version  # noqa
 
 # The short X.Y version.
 version = '.'.join(apache_manager_version.split('.')[:2])
