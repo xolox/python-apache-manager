@@ -20,6 +20,7 @@ extensions = [
     'sphinx.ext.doctest',
     'sphinx.ext.intersphinx',
     'sphinx.ext.viewcode',
+    'humanfriendly.sphinx',
 ]
 
 # Paths that contain templates, relative to this directory.
@@ -78,13 +79,3 @@ html_theme = 'default'
 
 # Output file base name for HTML help builder.
 htmlhelp_basename = 'apachemanagerdoc'
-
-
-def setup(app):
-    """
-    Configure the autodoc extension not to skip ``__init__()`` members.
-
-    Based on http://stackoverflow.com/a/5599712/788200.
-    """
-    app.connect('autodoc-skip-member', (lambda app, what, name, obj, skip, options:
-                                        False if name == '__init__' else skip))
