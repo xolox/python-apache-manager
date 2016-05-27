@@ -109,6 +109,7 @@ def main():
     max_ss = None
     watch = False
     zabbix_discovery = False
+    verbosity = 0
     # Parse the command line options.
     try:
         options, arguments = getopt.getopt(sys.argv[1:], 'wa:i:t:f:znvqh', [
@@ -134,8 +135,10 @@ def main():
                 dry_run = True
             elif option in ('-v', '--verbose'):
                 coloredlogs.increase_verbosity()
+                verbosity += 1
             elif option in ('-q', '--quiet'):
                 coloredlogs.decrease_verbosity()
+                verbosity -= 1
             elif option in ('-h', '--help'):
                 usage(__doc__)
                 return
@@ -156,7 +159,7 @@ def main():
             watch_metrics(manager)
         elif zabbix_discovery:
             report_zabbix_discovery(manager)
-        elif data_file != '-':
+        elif data_file != '-' and verbosity >= 0:
             for line in report_metrics(manager):
                 if line_is_heading(line):
                     line = ansi_wrap(line, color=HIGHLIGHT_COLOR)
