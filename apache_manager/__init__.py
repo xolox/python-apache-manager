@@ -30,7 +30,7 @@ from apache_manager.exceptions import AddressDiscoveryError, StatusPageError
 from apache_manager.compat import HTTPError, urlopen
 
 # Semi-standard module versioning.
-__version__ = '0.3'
+__version__ = '0.4'
 
 # Hide internal identifiers from API documentation.
 __all__ = (
@@ -65,6 +65,14 @@ IDLE_MODES = ('_', 'I', '.')
 """
 Worker modes that are considered idle (a tuple of strings). Refer to
 :attr:`WorkerStatus.is_idle`.
+"""
+
+NATIVE_WORKERS_LABEL = 'native'
+"""
+The label used to identify native Apache workers in exported metrics (a string).
+
+This is used by :func:`ApacheManager.save_metrics()` to distinguish native
+Apache workers from WSGI process groups.
 """
 
 # Initialize a logger for this module.
@@ -597,21 +605,38 @@ class ApacheManager(PropertyManager):
         :attr:`server_metrics` in a text file in an easy to parse format.
         Here's an example of what the contents of the file look like::
 
-            busy-workers           1
-            bytes-per-request      2816.0
-            bytes-per-second       1.53378
-            cpu-load               0.00020425
-            idle-workers           5
-            requests-per-second    0.000544665
+            # Global Apache server metrics.
+            busy-workers         1
+            bytes-per-request    0.0
+            bytes-per-second     0.0
+            cpu-load             1.13893
+            idle-workers         4
+            requests-per-second  1.89822
+            total-accesses       15
+            total-traffic        0
+            uptime               790212
+
+            # Metrics internal to apache-manager.
             status-response        0
-            total-accesses         96
-            total-traffic          264
-            uptime                 176255
             workers-killed-active  0
             workers-killed-idle    0
 
+            # Memory usage of native Apache worker processes.
+            memory-usage  native  count    5
+            memory-usage  native  min      331776
+            memory-usage  native  max      1662976
+            memory-usage  native  average  598016.0
+            memory-usage  native  median   331776
+
+            # Memory usage of 'example' WSGI worker processes.
+            memory-usage  example  count    4
+            memory-usage  example  min      356352
+            memory-usage  example  max      372736
+            memory-usage  example  average  368640.0
+            memory-usage  example  median   372736.0
+
         The values in the example above have been aligned to ease readability;
-        in reality the names and values are delimited by a tab character (as
+        in reality the names and values are delimited by tab characters (as
         long as you parse the file as whitespace delimited name/value pairs it
         will be fine, this is trivial to do with e.g. AWK_).
 
@@ -621,13 +646,34 @@ class ApacheManager(PropertyManager):
             logger.debug("Reporting metrics on standard output ..")
         else:
             logger.debug("Storing metrics in %s ..", data_file)
-        combined_metrics = dict(self.server_metrics)
-        combined_metrics.update(self.manager_metrics)
-        output = []
-        for name, value in sorted(combined_metrics.items()):
+        # Start with the server metrics.
+        output = ['# Global Apache server metrics.']
+        for name, value in sorted(self.server_metrics.items()):
+            output.append('%s\t%s' % (name.replace('_', '-'), value))
+        # Add our internal metrics.
+        output.extend(['', '# Metrics internal to apache-manager.'])
+        for name, value in sorted(self.manager_metrics.items()):
             if isinstance(value, bool):
                 value = 0 if value else 1
             output.append('%s\t%s' % (name.replace('_', '-'), value))
+        # Add memory usage metrics per group of (WSGI) workers.
+        groups = dict(self.wsgi_process_groups)
+        ordered_group_names = [NATIVE_WORKERS_LABEL] + sorted(groups.keys())
+        groups[NATIVE_WORKERS_LABEL] = self.memory_usage
+        metric_names = ('count', 'min', 'max', 'average', 'median')
+        for group_name in ordered_group_names:
+            output.append('')
+            if group_name == NATIVE_WORKERS_LABEL:
+                output.append('# Memory usage of native Apache worker processes.')
+            else:
+                output.append('# Memory usage of %r WSGI worker processes.' % group_name)
+            for metric in metric_names:
+                output.append('\t'.join([
+                    'memory-usage', group_name, metric, str(
+                        len(groups[group_name]) if metric == 'count'
+                        else getattr(groups[group_name], metric)
+                    ),
+                ]))
         if data_file == '-':
             print('\n'.join(output))
         else:
