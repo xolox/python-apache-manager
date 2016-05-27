@@ -30,7 +30,7 @@ from apache_manager.exceptions import AddressDiscoveryError, StatusPageError
 from apache_manager.compat import HTTPError, urlopen
 
 # Semi-standard module versioning.
-__version__ = '0.4'
+__version__ = '0.5'
 
 # Hide internal identifiers from API documentation.
 __all__ = (
