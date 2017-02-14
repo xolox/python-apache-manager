@@ -24,10 +24,11 @@ from property_manager import (
     required_property,
     writable_property,
 )
+from six.moves.urllib.error import HTTPError
+from six.moves.urllib.request import urlopen
 
 # Modules included in our package.
 from apache_manager.exceptions import AddressDiscoveryError, StatusPageError
-from apache_manager.compat import HTTPError, urlopen
 
 # Semi-standard module versioning.
 __version__ = '0.6'

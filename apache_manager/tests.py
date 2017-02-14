@@ -20,11 +20,11 @@ import unittest
 import coloredlogs
 from capturer import CaptureOutput
 from humanfriendly import compact, dedent
+from six.moves.urllib.request import Request, urlopen
 
 # Modules included in our package.
 from apache_manager import ApacheManager
 from apache_manager.cli import main
-from apache_manager.compat import Request, urlopen
 from apache_manager.exceptions import AddressDiscoveryError, StatusPageError
 
 # Initialize a logger for this module.
