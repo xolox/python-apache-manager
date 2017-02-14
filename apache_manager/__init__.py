@@ -1,7 +1,7 @@
 # Monitor and control Apache web server workers from Python.
 #
 # Author: Peter Odding <peter@peterodding.com>
-# Last Change: May 27, 2016
+# Last Change: February 14, 2017
 # URL: https://apache-manager.readthedocs.org
 
 """The :mod:`apache_manager` module defines the core logic of the Apache manager."""
@@ -224,7 +224,7 @@ class ApacheManager(PropertyManager):
 
         >>> from apache_manager import ApacheManager
         >>> manager = ApacheManager()
-        >>> manager.status_url
+        >>> manager.html_status_url
         'http://127.0.0.1:80/server-status'
         """
         status_url = "%s/server-status" % self.listen_addresses[0].url
@@ -242,7 +242,7 @@ class ApacheManager(PropertyManager):
 
         >>> from apache_manager import ApacheManager
         >>> manager = ApacheManager()
-        >>> manager.status_url
+        >>> manager.text_status_url
         'http://127.0.0.1:80/server-status?auto'
         """
         status_url = "%s?auto" % self.html_status_url
@@ -330,7 +330,7 @@ class ApacheManager(PropertyManager):
         The :attr:`slots` property contains one :class:`WorkerStatus` object
         for each worker "slot" that Apache has allocated. This means that some
         of the :class:`WorkerStatus` objects may not have expected properties
-        like :attr`WorkerStatus.pid` because they describe an "empty slot".
+        like :attr:`~WorkerStatus.pid` because they describe an "empty slot".
         See the :attr:`workers` property for a list of :class:`WorkerStatus`
         objects without empty slots.
         """
@@ -367,7 +367,7 @@ class ApacheManager(PropertyManager):
 
         This property's value is based on :attr:`slots` but excludes empty
         slots (i.e. every :class:`WorkerStatus` object in :attr:`workers` will
-        have expected properties like :attr`WorkerStatus.pid`).
+        have expected properties like :attr:`~WorkerStatus.pid`).
         """
         return [ws for ws in self.slots if ws.m != '.']
 
@@ -515,7 +515,7 @@ class ApacheManager(PropertyManager):
         >>> from apache_manager import ApacheManager
         >>> from pprint import pprint
         >>> manager = ApacheManager()
-        >>> pprint(mgr.wsgi_process_groups)
+        >>> pprint(manager.wsgi_process_groups)
         {'group-one': [44048384, 44724224, 44048384],
          'group-two': [52088832, 51879936, 55554048, 54956032, 54968320],
          'other-group': [13697024, 13697024, 13697024, 13697024]}
