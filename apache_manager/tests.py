@@ -64,7 +64,7 @@ def setUpModule():
 
 class ApacheManagerTestCase(unittest.TestCase):
 
-    """:py:mod:`unittest` compatible container for the `apache-manager` test suite."""
+    """:mod:`unittest` compatible container for the `apache-manager` test suite."""
 
     def setUp(self):
         """Reset the logging level before every test runs."""
@@ -80,7 +80,20 @@ class ApacheManagerTestCase(unittest.TestCase):
         with tempfile.NamedTemporaryFile() as temporary_file:
             manager = ApacheManager(temporary_file.name)
             self.assertRaises(AddressDiscoveryError, lambda: manager.listen_addresses)
-        # Test that port discovery returns at least one port.
+        # Test parsing of `Listen' directives with a port number but no IP address.
+        with tempfile.NamedTemporaryFile() as temporary_file:
+            with open(temporary_file.name, 'w') as handle:
+                handle.write('Listen 12345\n')
+            manager = ApacheManager(temporary_file.name)
+            assert 12345 in manager.listen_ports
+        # Test parsing of `Listen' directives with an IP address and port number.
+        with tempfile.NamedTemporaryFile() as temporary_file:
+            with open(temporary_file.name, 'w') as handle:
+                handle.write('Listen 127.0.0.2:54321\n')
+            manager = ApacheManager(temporary_file.name)
+            assert any(a.address == '127.0.0.2' and a.port == 54321
+                       for a in manager.listen_addresses)
+        # Test that port discovery on the host system returns at least one port.
         assert len(ApacheManager().listen_addresses) >= 1
 
     def test_text_status_page(self):
