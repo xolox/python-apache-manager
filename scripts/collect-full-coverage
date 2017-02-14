@@ -10,5 +10,4 @@ cat >&2 << EOF
 
 EOF
 
-sudo $(which coverage) run setup.py test
-coverage report --fail-under=90
+sudo $(which py.test) --cov --cov-fail-under=90

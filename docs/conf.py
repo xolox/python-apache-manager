@@ -34,7 +34,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'apache-manager'
-copyright = u'2016, Peter Odding'
+copyright = u'2017, Peter Odding'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -66,9 +66,9 @@ pygments_style = 'sphinx'
 # Refer to the Python standard library.
 # From: http://twistedmatrix.com/trac/ticket/4582.
 intersphinx_mapping = {
-    'python': ('http://docs.python.org', None),
-    'proc': ('https://proc.readthedocs.org/en/latest/', None),
-    'propertymanager': ('https://property-manager.readthedocs.org/en/latest/', None),
+    'python': ('https://docs.python.org/3', None),
+    'proc': ('https://proc.readthedocs.io/en/latest/', None),
+    'propertymanager': ('https://property-manager.readthedocs.io/en/latest/', None),
 }
 
 # -- Options for HTML output ---------------------------------------------------

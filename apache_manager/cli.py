@@ -2,7 +2,7 @@
 #
 # Author: Peter Odding <peter@peterodding.com>
 # Last Change: May 27, 2016
-# URL: https://apache-manager.readthedocs.org
+# URL: https://apache-manager.readthedocs.io
 
 """
 Usage: apache-manager [OPTIONS]

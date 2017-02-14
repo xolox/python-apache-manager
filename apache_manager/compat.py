@@ -2,7 +2,7 @@
 #
 # Author: Peter Odding <peter@peterodding.com>
 # Last Change: September 26, 2015
-# URL: https://apache-manager.readthedocs.org
+# URL: https://apache-manager.readthedocs.io
 
 """
 Compatibility between Python 2 and Python 3.

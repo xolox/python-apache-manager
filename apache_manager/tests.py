@@ -1,8 +1,8 @@
 # Monitor and control Apache web server workers from Python.
 #
 # Author: Peter Odding <peter@peterodding.com>
-# Last Change: May 27, 2016
-# URL: https://apache-manager.readthedocs.org
+# Last Change: February 14, 2017
+# URL: https://apache-manager.readthedocs.io
 
 """Test suite for the `apache-manager` project."""
 
@@ -228,7 +228,7 @@ class ApacheManagerTestCase(unittest.TestCase):
             # Use the Apache manager to kill the worker handling the request.
             def kill_active_worker():
                 manager = ApacheManager()
-                killed_processes = manager.kill_workers(max_memory_active=1024*1024*50)
+                killed_processes = manager.kill_workers(max_memory_active=1024 * 1024 * 50)
                 assert worker_pid in killed_processes
 
             # It might take a while for the worker to hit the memory limit.

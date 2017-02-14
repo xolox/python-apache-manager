@@ -1,0 +1,5 @@
+beautifulsoup4 >= 4.3.2
+coloredlogs >= 1.0.1
+humanfriendly >= 1.44.7
+proc >= 0.2.2
+property-manager >= 1.0.1

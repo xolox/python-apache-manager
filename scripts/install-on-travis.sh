@@ -5,8 +5,8 @@
 # assumes it is running on Ubuntu 12.04 because that's what Travis CI uses at
 # the time of writing.
 
-# Let apt-get, dpkg and related tools know that we want the following commands
-# to be 100% automated (no interactive prompts).
+# Let apt-get, dpkg and related tools know that we want the following
+# commands to be 100% automated (no interactive prompts).
 export DEBIAN_FRONTEND=noninteractive
 
 # Update apt-get's package lists.

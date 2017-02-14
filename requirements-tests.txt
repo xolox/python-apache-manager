@@ -1,0 +1,4 @@
+capturer >= 2.1
+coverage >= 4.2
+pytest >= 3.0.4
+pytest-cov >= 2.4.0

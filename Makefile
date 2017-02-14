@@ -1,77 +1,83 @@
-# Makefile for the `apache-monitor' package.
+# Makefile for the `apache-manager' package.
 #
 # Author: Peter Odding <peter@peterodding.com>
-# Last Change: September 26, 2015
+# Last Change: February 14, 2017
 # URL: https://github.com/xolox/python-apache-manager
 
-# The following defaults are based on my preferences, but possible for others
-# to override thanks to the `?=' operator.
+PACKAGE_NAME = apache-manager
 WORKON_HOME ?= $(HOME)/.virtualenvs
-VIRTUAL_ENV ?= $(WORKON_HOME)/apache-manager
-ACTIVATE = . "$(VIRTUAL_ENV)/bin/activate"
+VIRTUAL_ENV ?= $(WORKON_HOME)/$(PACKAGE_NAME)
+PATH := $(VIRTUAL_ENV)/bin:$(PATH)
+MAKE := $(MAKE) --no-print-directory
+SHELL = bash
 
 default:
-	@echo "Makefile for the 'apache-manager' package"
+	@echo "Makefile for $(PACKAGE_NAME)"
 	@echo
-	@echo 'Commands:'
+	@echo 'Usage:'
 	@echo
 	@echo '    make install    install the package in a virtual environment'
 	@echo '    make reset      recreate the virtual environment'
-	@echo '    make test       run the test suite'
-	@echo '    make coverage   run the tests, report coverage'
-	@echo '    make check      check the coding style'
+	@echo '    make check      check coding style (PEP-8, PEP-257)'
+	@echo '    make test       run the test suite, report coverage'
+	@echo '    make tox        run the tests on all Python versions'
+	@echo '    make readme     update usage in readme'
 	@echo '    make docs       update documentation using Sphinx'
 	@echo '    make publish    publish changes to GitHub/PyPI'
 	@echo '    make clean      cleanup all temporary files'
 	@echo
-	@echo 'Variables:'
-	@echo
-	@echo "    WORKON_HOME = $(WORKON_HOME)"
-	@echo "    VIRTUAL_ENV = $(VIRTUAL_ENV)"
 
 install:
-	test -d "$(VIRTUAL_ENV)" || mkdir -p "$(VIRTUAL_ENV)"
-	test -x "$(VIRTUAL_ENV)/bin/python" || virtualenv "$(VIRTUAL_ENV)"
-	test -x "$(VIRTUAL_ENV)/bin/pip" || ($(ACTIVATE) && easy_install pip)
-	test -x "$(VIRTUAL_ENV)/bin/pip-accel" || ($(ACTIVATE) && pip install pip-accel)
-	$(ACTIVATE) && pip uninstall --yes apache-manager >/dev/null 2>&1 || true
-	$(ACTIVATE) && pip install --quiet --editable .
+	@test -d "$(VIRTUAL_ENV)" || mkdir -p "$(VIRTUAL_ENV)"
+	@test -x "$(VIRTUAL_ENV)/bin/python" || virtualenv --quiet "$(VIRTUAL_ENV)"
+	@test -x "$(VIRTUAL_ENV)/bin/pip" || easy_install pip
+	@test -x "$(VIRTUAL_ENV)/bin/pip-accel" || pip install --quiet pip-accel
+	@pip-accel install --quiet --requirement=requirements.txt
+	@pip uninstall --yes $(PACKAGE_NAME) &>/dev/null || true
+	@pip install --quiet --no-deps --ignore-installed .
 
 reset:
+	$(MAKE) clean
 	rm -Rf "$(VIRTUAL_ENV)"
-	make --no-print-directory clean install
-
-test: install
-	test -x "$(VIRTUAL_ENV)/bin/py.test" || ($(ACTIVATE) && pip-accel install pytest)
-	$(ACTIVATE) && py.test -v
-	$(ACTIVATE) && make coverage
-	test -x "$(VIRTUAL_ENV)/bin/tox" || ($(ACTIVATE) && pip-accel install tox)
-	$(ACTIVATE) && tox
-
-coverage: install
-	$(ACTIVATE) && pip-accel install coverage
-	$(ACTIVATE) && scripts/collect-full-coverage
-	$(ACTIVATE) && coverage html
+	$(MAKE) install
 
 check: install
-	test -x "$(VIRTUAL_ENV)/bin/flake8" || ($(ACTIVATE) && pip-accel install flake8-pep257)
-	$(ACTIVATE) && flake8
+	@scripts/check-code-style.sh
 
-readme:
-	test -x "$(VIRTUAL_ENV)/bin/cog.py" || ($(ACTIVATE) && pip-accel install cogapp)
-	$(ACTIVATE) && cog.py -r README.rst
+test: install
+	@pip-accel install --quiet --requirement=requirements-tests.txt
+	@py.test --cov
+	@coverage html
 
-docs: install
-	test -x "$(VIRTUAL_ENV)/bin/sphinx-build" || ($(ACTIVATE) && pip-accel install sphinx)
-	$(ACTIVATE) && cd docs && sphinx-build -b html -d build/doctrees . build/html
+tox: install
+	@pip-accel install --quiet tox && tox
 
-publish:
+# The following makefile target isn't documented on purpose, I don't want
+# people to execute this without them knowing very well what they're doing.
+
+full-coverage: install
+	@pip-accel install --quiet --requirement=requirements-tests.txt
+	@scripts/collect-full-coverage
+	@coverage html
+
+readme: install
+	@pip-accel install --quiet cogapp && cog.py -r README.rst
+
+docs: readme
+	@pip-accel install --quiet sphinx
+	@cd docs && sphinx-build -nb html -d build/doctrees . build/html
+
+publish: install
 	git push origin && git push --tags origin
-	make clean && python setup.py sdist upload
+	$(MAKE) clean
+	pip-accel install --quiet twine wheel
+	python setup.py sdist bdist_wheel
+	twine upload dist/*
+	$(MAKE) clean
 
 clean:
-	rm -Rf *.egg *.egg-info .coverage build dist docs/build htmlcov
-	find -depth -type d -name __pycache__ -exec rm -Rf {} \;
-	find -type f -name '*.pyc' -delete
+	@rm -Rf *.egg .cache .coverage .tox build dist docs/build htmlcov
+	@find -depth -type d -name __pycache__ -exec rm -Rf {} \;
+	@find -type f -name '*.pyc' -delete
 
-.PHONY: default install reset test coverage check docs publish clean
+.PHONY: default install reset check test tox full-coverage readme docs publish clean

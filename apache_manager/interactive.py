@@ -2,7 +2,7 @@
 #
 # Author: Peter Odding <peter@peterodding.com>
 # Last Change: September 26, 2015
-# URL: https://apache-manager.readthedocs.org
+# URL: https://apache-manager.readthedocs.io
 
 """
 A ``top`` like interactive viewer for Apache web server metrics.
