@@ -1,7 +1,7 @@
 # Monitor and control Apache web server workers from Python.
 #
 # Author: Peter Odding <peter@peterodding.com>
-# Last Change: February 14, 2017
+# Last Change: February 15, 2017
 # URL: https://apache-manager.readthedocs.io
 
 """The :mod:`apache_manager` module defines the core logic of the Apache manager."""
@@ -202,19 +202,7 @@ class ApacheManager(PropertyManager):
                      concatenate(map(str, matched_addresses)))
         return matched_addresses
 
-    @cached_property
-    def listen_ports(self):
-        """
-        Port(s) on which Apache is configured to be listening (a sorted list of integers).
-
-        :raises: Any exceptions raised by :attr:`listen_addresses`.
-
-        This property is deprecated because :attr:`listen_addresses` should
-        be used instead. It remains only for backwards compatibility.
-        """
-        return sorted(a.port for a in self.listen_addresses if a.address == '127.0.0.1')
-
-    @cached_property
+    @cached_property(writable=True)
     def html_status_url(self):
         """
         The URL on which Apache's HTML status page can be retrieved (a string).
@@ -345,12 +333,12 @@ class ApacheManager(PropertyManager):
         # marked as such in the HTML output ...
         for table in soup.findAll('table'):
             # Parse the table into a list of dictionaries, one for each row.
-            matched_rows = list(parse_status_table(table, WorkerStatus))
+            matched_rows = list(parse_status_table(table))
             # Filter out rows that don't contain the required columns.
             validated_rows = [r for r in matched_rows if all(c in r for c in required_columns)]
             # If one or more rows remain we found the right table! :-)
             if validated_rows:
-                return validated_rows
+                return [WorkerStatus(status_fields=f) for f in validated_rows]
         raise StatusPageError(compact("""
             Failed to parse Apache status page! No tables found containing all
             of the required column headings and at least one row of data that
@@ -379,8 +367,8 @@ class ApacheManager(PropertyManager):
         native_pids = set(w.pid for w in self.workers)
         for process in find_apache_workers():
             if process.pid not in native_pids:
-                all_workers.append(NonNativeWorker(process))
-        return all_workers
+                all_workers.append(NonNativeWorker(process=process))
+        return sorted(all_workers, key=lambda p: p.pid)
 
     @property
     def manager_metrics(self):
@@ -563,6 +551,7 @@ class ApacheManager(PropertyManager):
         See also :attr:`num_killed_active` and :attr:`num_killed_idle`.
         """
         killed = set()
+        num_checked = 0
         for worker in self.killable_workers:
             # Depending on the multiprocessing module in use multiple workers
             # may be using the same OS process. We leave it up to the caller
@@ -573,12 +562,12 @@ class ApacheManager(PropertyManager):
                 kill_worker = False
                 memory_usage_threshold = max_memory_active if worker.is_active else max_memory_idle
                 if memory_usage_threshold and worker.memory_usage > memory_usage_threshold:
-                    logger.info("Killing %s using %s (last request: %s) ..",
+                    logger.info("Killing %s using %s (%s) ..",
                                 worker, format_size(worker.memory_usage),
-                                worker.request or 'unknown')
+                                worker.request or 'last request unknown')
                     kill_worker = True
                 elif timeout and worker.is_active and getattr(worker, 'ss', 0) > timeout:
-                    logger.info("Killing %s hanging for %s since last request (last request: %s) ..",
+                    logger.info("Killing %s hanging for %s since last request (%s) ..",
                                 worker, format_timespan(worker.ss),
                                 worker.request or 'unknown')
                     kill_worker = True
@@ -590,10 +579,12 @@ class ApacheManager(PropertyManager):
                         self.num_killed_active += 1
                     else:
                         self.num_killed_idle += 1
+            num_checked += 1
         if killed:
-            logger.info("Killed %s.", pluralize(len(killed), "Apache worker"))
+            logger.info("Killed %i of %s.", len(killed), pluralize(num_checked, "Apache worker"))
         else:
-            logger.info("No Apache workers killed (all workers within resource usage limits).")
+            logger.info("No Apache workers killed (found %s within resource usage limits).",
+                        pluralize(num_checked, "worker"))
         return list(killed)
 
     def save_metrics(self, data_file):
@@ -720,30 +711,32 @@ class NetworkAddress(PropertyManager):
         return self.url
 
 
-class KillableWorker(object):
+class KillableWorker(PropertyManager):
 
     """
     Abstract base class to represent killable Apache worker processes.
 
     Worker processes can be killed based on resource usage thresholds like
-    memory usage and/or requests that are taking too long to process.
+    memory usage and/or requests that are taking too long to process. There
+    are currently two implementations of killable workers:
+
+    - :class:`WorkerStatus` represents the information about a worker process
+      that was retrieved from Apache's status page.
+
+    - :class:`NonNativeWorker` represents processes that are direct descendants
+      of the master Apache process but are not included in the workers listed
+      on Apache's status page (e.g. WSGI daemon processes spawned by
+      mod_wsgi_).
     """
+
+    @required_property
+    def is_active(self):
+        """:data:`True` if the worker is processing a request, :data:`False` otherwise."""
 
     @property
     def is_alive(self):
-        """:data:`True` if :attr:`pid` refers to an existing process, :data:`False` otherwise."""
+        """:data:`True` if :attr:`process` is running, :data:`False` otherwise."""
         return self.process.is_alive if self.process else False
-
-    @lazy_property(writable=True)
-    def process(self):
-        """
-        The :class:`proc.core.Process` object for this :attr:`pid`.
-
-        If the worker process disappears before the process information is
-        requested then this value will be :data:`None`.
-        """
-        if self.pid:
-            return Process.from_pid(self.pid)
 
     @lazy_property
     def memory_usage(self):
@@ -759,161 +752,31 @@ class KillableWorker(object):
         """
         return self.process.rss if self.process else None
 
-
-class WorkerStatus(KillableWorker, dict):
-
-    """
-    :class:`WorkerStatus` objects represent the state of an Apache worker.
-
-    These objects are constructed by :attr:`ApacheManager.workers`. To give you
-    an idea of what :class:`WorkerStatus` objects look like, here's a simple
-    example:
-
-    >>> from apache_manager import ApacheManager
-    >>> from pprint import pprint
-    >>> manager = ApacheManager()
-    >>> pprint(manager.workers[0])
-    {'acc': (0, 8, 8),
-     'child': 0.02,
-     'client': '127.0.0.1',
-     'conn': 0.0,
-     'cpu': 0.03,
-     'm': '_',
-     'pid': 17313,
-     'req': 0,
-     'request': 'GET /server-status HTTP/1.0',
-     'slot': 0.02,
-     'srv': (0, 0),
-     'ss': 22,
-     'vhost': '127.0.1.1'}
-
-    The naming of the fields may look somewhat obscure, this is because they
-    match the names given on the Apache status page. If any of the fields are
-    not available their value will be :data:`None`. The following properties
-    are parsed from the Apache status page:
-
-    .. attribute:: srv
-
-       Child Server number and generation (a tuple of two integers).
-
-    .. attribute:: pid
-
-       The process ID of the Apache worker (an integer).
-
-    .. attribute:: acc
-
-       The number of accesses this connection / this child / this slot (a tuple
-       of three integers).
-
-    .. attribute:: m
-
-       Mode of operation (a string). Some known modes:
-
-       =====  =================================
-       Mode   Description
-       =====  =================================
-       ``_``  Waiting for connection
-       ``S``  Starting up
-       ``R``  Reading request
-       ``W``  Sending reply
-       ``K``  Keepalive (read)
-       ``D``  DNS lookup
-       ``C``  Closing connection
-       ``L``  Logging
-       ``G``  Gracefully finishing
-       ``I``  Idle cleanup of worker
-       ``.``  Open slot with no current process
-       =====  =================================
-
-       See also :attr:`is_active` and :attr:`is_idle`.
-
-    .. attribute:: cpu
-
-       The CPU usage (number of seconds as a floating point number).
-
-    .. attribute:: ss
-
-       The number of seconds since the beginning of the most recent request (a
-       float).
-
-    .. attribute:: req
-
-       The number of milliseconds required to process the most recent request
-       (an integer).
-
-    .. attribute:: conn
-
-       The number of kilobytes transferred this connection (a float).
-
-    .. attribute:: child
-
-        The number of megabytes transferred this child (a float).
-
-    .. attribute:: slot
-
-        The total number of megabytes transferred this slot (a float).
-
-    .. attribute:: request
-
-       The HTTP status line of the most recent request (a string).
-
-    The following computed properties are based on the properties parsed from
-    the Apache status page:
-    """
-
-    def __init__(self, *args, **kw):
+    @required_property
+    def pid(self):
         """
-        Initialize a :class:`WorkerStatus` object.
+        The process ID of the Apache worker (an integer or :data:`None`).
 
-        The constructor of these objects is used as a dictionary constructor,
-        i.e. passing it an iterable of key/value pairs with collected metrics.
+        If :attr:`process` is set then the value of :attr:`pid` defaults to
+        :attr:`proc.core.Process.pid`.
         """
-        # Delegate initialization to the superclass.
-        super(WorkerStatus, self).__init__(*args, **kw)
-        # Coerce fields to their proper Python type.
-        self['acc'] = tuple(coerce_value(int, n) for n in self['acc'].split('/'))
-        self['child'] = coerce_value(float, self['child'])
-        self['conn'] = coerce_value(float, self['conn'])
-        self['cpu'] = coerce_value(float, self['cpu'])
-        self['pid'] = coerce_value(int, self['pid'])
-        self['req'] = coerce_value(int, self['req'])
-        self['slot'] = coerce_value(float, self['slot'])
-        self['srv'] = tuple(coerce_value(int, n) for n in self['srv'].split('-'))
-        self['ss'] = coerce_value(int, self['ss'])
-        # The default value of the `request' field is NULL. We hide this
-        # obscure (C) implementation detail from Python.
-        if self.get('request', 'NULL') == 'NULL':
-            self['request'] = None
+        return self.process.pid if self.process else None
 
-    @property
-    def is_idle(self):
+    @mutable_property(cached=True)
+    def process(self):
         """
-        :data:`True` if the worker is idle, :data:`False` otherwise.
+        The :class:`proc.core.Process` object for this worker process (or :data:`None`).
 
-        The value of this property is based on :attr:`m` and
-        :data:`IDLE_MODES`.
+        If :attr:`pid` is set then the value of :attr:`process` defaults to the
+        result of :func:`proc.core.Process.from_pid()`. If the worker process
+        disappears before the process information is requested :attr:`process`
+        will be :data:`None`.
         """
-        return self['m'] in IDLE_MODES
+        return Process.from_pid(self.pid) if self.pid else None
 
-    @property
-    def is_active(self):
-        """
-        :data:`True` if the worker isn't idle, :data:`False` otherwise.
-
-        The value of this property is based on :attr:`is_idle`.
-        """
-        return not self.is_idle
-
-    def __getattr__(self, name):
-        """Provide access to dictionary fields with attribute syntax."""
-        try:
-            return self[name]
-        except KeyError:
-            raise AttributeError("'%s' object has no attribute '%s'" % (self.__class__.__name__, name))
-
-    def __str__(self):
-        """Render a human friendly representation of a native Apache worker."""
-        return "native worker %i (%s)" % (self.pid, "active" if self.is_active else "idle")
+    @mutable_property
+    def request(self):
+        """The HTTP status line of the most recent request (a string or :data:`None`)."""
 
 
 class NonNativeWorker(KillableWorker):
@@ -934,23 +797,183 @@ class NonNativeWorker(KillableWorker):
     .. _mod_wsgi: https://code.google.com/p/modwsgi/
     """
 
-    def __init__(self, process):
-        """
-        Initialize a :class:`NonNativeWorker` object.
+    @required_property
+    def process(self):
+        """The :class:`proc.core.Process` object for this worker process."""
 
-        :param process: A :class:`proc.tree.ProcessNode` object.
-        """
-        self.process = process
-        self.pid = process.pid
-        self.is_active = True
-        self.request = None
+    @required_property
+    def is_active(self):
+        """:data:`True` because this information isn't available for non-native workers."""
+        return True
 
     def __str__(self):
         """Render a human friendly representation of a non-native Apache worker."""
         return "non-native worker %i" % self.pid
 
 
-def parse_status_table(table, dict_type=dict):
+class WorkerStatus(KillableWorker):
+
+    """
+    :class:`WorkerStatus` objects represent the state of an Apache worker.
+
+    These objects are constructed by the :attr:`ApacheManager.workers`
+    property. To give you an idea of what :class:`WorkerStatus` objects look
+    like, here's a simple example:
+
+    >>> from apache_manager import ApacheManager
+    >>> manager = ApacheManager()
+    >>> print(manager.workers[0])
+    WorkerStatus(acc=(0, 6, 128),
+                 child=0.01,
+                 conn=0.0,
+                 cpu=0.03,
+                 is_active=False,
+                 is_alive=True,
+                 is_idle=True,
+                 m='_',
+                 memory_usage=5185536,
+                 pid=31212,
+                 process=Process(...),
+                 req=1,
+                 request='GET /server-status HTTP/1.1',
+                 slot=0.2,
+                 srv=(0, 38),
+                 ss=234)
+
+    The naming of the fields may look somewhat obscure, this is because they
+    match the names given on the Apache status page. If any of the fields are
+    not available their value will be :data:`None`. The following properties
+    are parsed from the Apache status page:
+
+    The following computed properties are based on the properties parsed from
+    the Apache status page:
+    """
+
+    @required_property
+    def status_fields(self):
+        """The raw status fields extracted from Apache's status page (a dictionary)."""
+
+    @lazy_property
+    def acc(self):
+        """The number of accesses this connection / this child / this slot (a tuple of three integers)."""
+        raw_value = self.status_fields.get('acc', '0/0/0')
+        return tuple(coerce_value(int, n) for n in raw_value.split('/'))
+
+    @lazy_property
+    def child(self):
+        """The number of megabytes transferred this child (a float)."""
+        return coerce_value(float, self.status_fields.get('child', '0'))
+
+    @lazy_property
+    def client(self):
+        """The IP address of the client that was last served (a string)."""
+        return self.status_fields.get('client')
+
+    @lazy_property
+    def conn(self):
+        """The number of kilobytes transferred this connection (a float)."""
+        return coerce_value(float, self.status_fields.get('conn', '0'))
+
+    @lazy_property
+    def cpu(self):
+        """The CPU usage (number of seconds as a floating point number)."""
+        return coerce_value(float, self.status_fields.get('cpu', '0'))
+
+    @property
+    def is_idle(self):
+        """
+        :data:`True` if the worker is idle, :data:`False` otherwise.
+
+        The value of this property is based on :attr:`m` and
+        :data:`IDLE_MODES`.
+        """
+        return self.m in IDLE_MODES
+
+    @property
+    def is_active(self):
+        """
+        :data:`True` if the worker isn't idle, :data:`False` otherwise.
+
+        The value of this property is based on :attr:`is_idle`.
+        """
+        return not self.is_idle
+
+    @lazy_property
+    def m(self):
+        """
+        The mode of operation (a string).
+
+        Here's an overview of known modes (not intended as an exhaustive list):
+
+        =====  =================================
+        Mode   Description
+        =====  =================================
+        ``_``  Waiting for connection
+        ``S``  Starting up
+        ``R``  Reading request
+        ``W``  Sending reply
+        ``K``  Keepalive (read)
+        ``D``  DNS lookup
+        ``C``  Closing connection
+        ``L``  Logging
+        ``G``  Gracefully finishing
+        ``I``  Idle cleanup of worker
+        ``.``  Open slot with no current process
+        =====  =================================
+
+        See also :attr:`is_active` and :attr:`is_idle`.
+        """
+        return self.status_fields.get('m')
+
+    @lazy_property
+    def pid(self):
+        """The process ID of the Apache worker (an integer)."""
+        return coerce_value(int, self.status_fields.get('pid'))
+
+    @lazy_property
+    def req(self):
+        """The number of milliseconds required to process the most recent request (an integer)."""
+        return coerce_value(int, self.status_fields.get('req'))
+
+    @lazy_property
+    def request(self):
+        """
+        The HTTP status line of the most recent request (a string or :data:`None`).
+
+        The default value of the :attr:`request` field on Apache's status page
+        is the string ``NULL``. This obscure implementation detail is hidden by
+        the :attr:`request` property.
+        """
+        value = self.status_fields.get('request', 'NULL')
+        return value if value != 'NULL' else None
+
+    @lazy_property
+    def slot(self):
+        """The total number of megabytes transferred this slot (a float)."""
+        return coerce_value(float, self.status_fields.get('slot', '0'))
+
+    @lazy_property
+    def srv(self):
+        """Child Server number and generation (a tuple of two integers)."""
+        raw_value = self.status_fields.get('srv', '0-0')
+        return tuple(coerce_value(int, n) for n in raw_value.split('-'))
+
+    @lazy_property
+    def ss(self):
+        """The number of seconds since the beginning of the most recent request (a float)."""
+        return coerce_value(int, self.status_fields.get('ss', '0'))
+
+    @lazy_property
+    def vhost(self):
+        """The server name and port of the virtual host that served the last request (a string)."""
+        return self.status_fields.get('vhost')
+
+    def __str__(self):
+        """Render a human friendly representation of a native Apache worker."""
+        return "native worker %i (%s)" % (self.pid, "active" if self.is_active else "idle")
+
+
+def parse_status_table(table):
     """Parse one of the status tables from Apache's HTML status page."""
     headings = dict((i, normalize_text(coerce_tag(th))) for i, th in enumerate(table.findAll('th')))
     logger.debug("Parsed table headings: %r", headings)
@@ -961,7 +984,7 @@ def parse_status_table(table, dict_type=dict):
             # Ignore exceptions during coercion.
             # TODO This can obscure real problems. Find a better way to make it robust!
             try:
-                values_by_name = dict_type((headings[i], v) for i, v in enumerate(values_by_index))
+                values_by_name = dict((headings[i], v) for i, v in enumerate(values_by_index))
                 logger.debug("Parsed values by name: %r", values_by_name)
                 yield values_by_name
             except Exception:

@@ -1,7 +1,7 @@
 # Monitor and control Apache web server workers from Python.
 #
 # Author: Peter Odding <peter@peterodding.com>
-# Last Change: May 27, 2016
+# Last Change: February 15, 2017
 # URL: https://apache-manager.readthedocs.io
 
 """
@@ -56,11 +56,11 @@ Supported options:
 
   -v, --verbose
 
-    Make more noise.
+    Increase verbosity (can be repeated).
 
   -q, --quiet
 
-    Make less noise.
+    Decrease verbosity (can be repeated).
 
   -h, --help
 
@@ -100,7 +100,7 @@ logger = logging.getLogger(__name__)
 def main():
     """Command line interface for the ``apache-manager`` program."""
     # Configure logging output.
-    coloredlogs.install()
+    coloredlogs.install(syslog=True)
     # Command line option defaults.
     data_file = '/tmp/apache-manager.txt'
     dry_run = False
@@ -155,7 +155,7 @@ def main():
                 timeout=max_ss,
                 dry_run=dry_run,
             )
-        if watch and connected_to_terminal(sys.stdout):
+        elif watch and connected_to_terminal(sys.stdout):
             watch_metrics(manager)
         elif zabbix_discovery:
             report_zabbix_discovery(manager)

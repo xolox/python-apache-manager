@@ -1,7 +1,7 @@
 # Monitor and control Apache web server workers from Python.
 #
 # Author: Peter Odding <peter@peterodding.com>
-# Last Change: February 14, 2017
+# Last Change: February 15, 2017
 # URL: https://apache-manager.readthedocs.io
 
 """Test suite for the `apache-manager` project."""
@@ -20,6 +20,7 @@ import unittest
 import coloredlogs
 from capturer import CaptureOutput
 from humanfriendly import compact, dedent
+from six import text_type
 from six.moves.urllib.request import Request, urlopen
 
 # Modules included in our package.
@@ -85,7 +86,7 @@ class ApacheManagerTestCase(unittest.TestCase):
             with open(temporary_file.name, 'w') as handle:
                 handle.write('Listen 12345\n')
             manager = ApacheManager(temporary_file.name)
-            assert 12345 in manager.listen_ports
+            assert any(a.port == 12345 for a in manager.listen_addresses)
         # Test parsing of `Listen' directives with an IP address and port number.
         with tempfile.NamedTemporaryFile() as temporary_file:
             with open(temporary_file.name, 'w') as handle:
@@ -133,8 +134,30 @@ class ApacheManagerTestCase(unittest.TestCase):
         retry(lambda: any(w.is_active for w in manager.workers))
         retry(lambda: any(w.is_alive for w in manager.workers))
         retry(lambda: any(w.is_idle for w in manager.workers))
-        retry(lambda: any(w.process for w in manager.workers))
-        self.assertRaises(AttributeError, lambda: manager.workers[0].no_such_attribute)
+        retry(lambda: any(isinstance(w.acc, tuple)for w in manager.workers))
+        # Validate the WorkerStatus.acc property.
+        worker = manager.workers[0]
+        assert isinstance(worker.acc, tuple)
+        assert len(worker.acc) == 3
+        assert all(isinstance(n, int) for n in worker.acc)
+        # Validate the WorkerStatus.child property.
+        assert isinstance(worker.child, float)
+        # Validate the WorkerStatus.client property.
+        assert isinstance(worker.client, text_type) and worker.client
+        # Validate the WorkerStatus.conn property.
+        assert isinstance(worker.conn, float)
+        # Validate the WorkerStatus.cpu property.
+        assert isinstance(worker.cpu, float)
+        # Validate the WorkerStatus.req property.
+        assert isinstance(worker.req, int)
+        # Validate the WorkerStatus.slot property.
+        assert isinstance(worker.slot, float)
+        # Validate the WorkerStatus.srv property.
+        assert isinstance(worker.srv, tuple)
+        assert len(worker.srv) == 2
+        assert all(isinstance(n, int) for n in worker.srv)
+        # Validate the WorkerStatus.vhost property.
+        assert isinstance(worker.vhost, text_type) and worker.vhost
 
     def test_manager_metrics(self):
         """Test that the Apache manager successfully reports metrics about itself."""

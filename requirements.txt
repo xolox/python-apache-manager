@@ -1,6 +1,6 @@
 beautifulsoup4 >= 4.3.2
-coloredlogs >= 1.0.1
-humanfriendly >= 1.44.7
-proc >= 0.2.2
-property-manager >= 1.0.1
+coloredlogs >= 5.2
+humanfriendly >= 2.4
+proc >= 0.12
+property-manager >= 2.1
 six >= 1.9.0

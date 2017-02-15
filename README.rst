@@ -100,8 +100,8 @@ Command line interface to monitor the Apache web server and kill worker processe
    groups that are active on any given server. This makes it possible to
    collect and analyze the memory usage of specific WSGI process groups."
    "``-n``, ``--dry-run``, ``--simulate``",Don't actually kill any Apache workers.
-   "``-v``, ``--verbose``",Make more noise.
-   "``-q``, ``--quiet``",Make less noise.
+   "``-v``, ``--verbose``",Increase verbosity (can be repeated).
+   "``-q``, ``--quiet``",Decrease verbosity (can be repeated).
    "``-h``, ``--help``","Show this message and exit.
    "
 

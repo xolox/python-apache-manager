@@ -23,6 +23,9 @@ extensions = [
     'humanfriendly.sphinx',
 ]
 
+# Configuration for the `autodoc' extension.
+autodoc_member_order = 'bysource'
+
 # Paths that contain templates, relative to this directory.
 templates_path = ['templates']
 
