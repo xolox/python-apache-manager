@@ -1,7 +1,7 @@
 # Monitor and control Apache web server workers from Python.
 #
 # Author: Peter Odding <peter@peterodding.com>
-# Last Change: February 15, 2017
+# Last Change: March 6, 2017
 # URL: https://apache-manager.readthedocs.io
 
 """Test suite for the `apache-manager` project."""
@@ -184,14 +184,14 @@ class ApacheManagerTestCase(unittest.TestCase):
     def test_refresh(self):
         """Test refreshing of cached properties."""
         manager = ApacheManager()
-        initial_uptime = manager.server_metrics['uptime']
+        initial_accesses = manager.server_metrics['total_accesses']
         time.sleep(1)
-        cached_uptime = manager.server_metrics['uptime']
-        assert cached_uptime == initial_uptime
+        cached_accesses = manager.server_metrics['total_accesses']
+        assert cached_accesses == initial_accesses
         manager.refresh()
         time.sleep(1)
-        fresh_uptime = manager.server_metrics['uptime']
-        assert fresh_uptime > initial_uptime
+        fresh_accesses = manager.server_metrics['total_accesses']
+        assert fresh_accesses > initial_accesses
 
     def test_save_metrics(self):
         """Test that monitoring metrics can be saved to a text file."""
