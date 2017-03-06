@@ -31,7 +31,7 @@ from six.moves.urllib.request import urlopen
 from apache_manager.exceptions import AddressDiscoveryError, StatusPageError
 
 # Semi-standard module versioning.
-__version__ = '1.0'
+__version__ = '1.1'
 
 # Hide internal identifiers from API documentation.
 __all__ = (
