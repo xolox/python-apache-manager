@@ -1,7 +1,7 @@
 # Monitor and control Apache web server workers from Python.
 #
 # Author: Peter Odding <peter@peterodding.com>
-# Last Change: February 15, 2017
+# Last Change: March 6, 2017
 # URL: https://apache-manager.readthedocs.io
 
 """The :mod:`apache_manager` module defines the core logic of the Apache manager."""
@@ -35,13 +35,17 @@ __version__ = '1.0'
 
 # Hide internal identifiers from API documentation.
 __all__ = (
-    'ApacheManager',
+    # Configuration defaults.
+    'HANGING_WORKER_THRESHOLD',
     'IDLE_MODES',
+    'NATIVE_WORKERS_LABEL',
+    'PORTS_CONF',
+    'STATUS_COLUMNS',
+    # Public classes.
+    'ApacheManager',
     'KillableWorker',
     'NetworkAddress',
     'NonNativeWorker',
-    'PORTS_CONF',
-    'STATUS_COLUMNS',
     'WorkerStatus',
 )
 
@@ -74,6 +78,12 @@ The label used to identify native Apache workers in exported metrics (a string).
 
 This is used by :func:`ApacheManager.save_metrics()` to distinguish native
 Apache workers from WSGI process groups.
+"""
+
+HANGING_WORKER_THRESHOLD = 60 * 5
+"""
+The number of seconds before an active worker is considered 'hanging' (a
+number). Refer to :attr:`ApacheManager.hanging_workers`.
 """
 
 # Initialize a logger for this module.
@@ -361,6 +371,21 @@ class ApacheManager(PropertyManager):
         return [ws for ws in self.slots if ws.m != '.']
 
     @cached_property
+    def hanging_workers(self):
+        """
+        A list of workers that appear to be 'hanging' (unresponsive).
+
+        :raises: Any exceptions raised by :attr:`html_status` or
+                 :exc:`.StatusPageError` if parsing of the Apache status page
+                 fails.
+
+        This property's value is based on :attr:`workers` but excludes workers
+        that aren't active and workers whose 'seconds since the beginning of
+        the current request' is lower than :data:`HANGING_WORKER_THRESHOLD`.
+        """
+        return [ws for ws in self.workers if ws.is_active and ws.ss >= HANGING_WORKER_THRESHOLD]
+
+    @cached_property
     def killable_workers(self):
         """A list of :class:`KillableWorker` objects."""
         all_workers = list(self.workers)
@@ -381,7 +406,10 @@ class ApacheManager(PropertyManager):
         >>> from pprint import pprint
         >>> manager = ApacheManager()
         >>> pprint(manager.manager_metrics)
-        {'workers_killed_active': 0, 'workers_killed_idle': 0, 'status_response': None}
+        {'workers_hanging': 0,
+         'workers_killed_active': 0,
+         'workers_killed_idle': 0,
+         'status_response': None}
 
         Notes about these metrics:
 
@@ -390,10 +418,13 @@ class ApacheManager(PropertyManager):
           status page was fetched successfully or :data:`False` if fetching of
           the status page failed (see :func:`fetch_status_page()`,
           :attr:`html_status` and :attr:`text_status`).
+        - The ``workers_hanging`` key gives the number of hanging workers
+          (based on the length of :attr:`hanging_workers`).
         - The ``workers_killed_active`` and ``workers_killed_idle`` keys give
           the number of Apache workers killed by :func:`kill_workers()`.
         """
-        return dict(workers_killed_active=self.num_killed_active,
+        return dict(workers_hanging=len(self.hanging_workers),
+                    workers_killed_active=self.num_killed_active,
                     workers_killed_idle=self.num_killed_idle,
                     status_response=self.status_response)
 
