@@ -19,7 +19,9 @@ import unittest
 # External dependencies.
 import coloredlogs
 from capturer import CaptureOutput
+from executor import execute
 from humanfriendly import compact, dedent
+from natsort import NaturalOrderKey
 from six import text_type
 from six.moves.urllib.request import Request, urlopen
 
@@ -417,12 +419,25 @@ class TemporaryWSGIApp(object):
         logger.info("Creating Apache virtual host: %s", self.virtual_host_file)
         with open(self.virtual_host_file, 'w') as handle:
             netloc = self.manager.listen_addresses[0]
-            handle.write(dedent('''
-                <VirtualHost {netloc.address}:{netloc.port}>
-                    ServerName {server_name}
-                    WSGIScriptAlias / {wsgi_script}
-                </VirtualHost>
-            ''', netloc=netloc, server_name=self.name, wsgi_script=self.wsgi_script_file))
+            installed_version = execute('dpkg-query', '--show', '--showformat=${Version}', 'apache2', capture=True)
+            if NaturalOrderKey(installed_version) >= NaturalOrderKey('2.4'):
+                root = tempfile.gettempdir()
+                handle.write(dedent('''
+                    <VirtualHost {netloc.address}:{netloc.port}>
+                        ServerName {server_name}
+                        WSGIScriptAlias / {wsgi_script}
+                        <Directory "{root}">
+                            Require all granted
+                        </Directory>
+                    </VirtualHost>
+                ''', netloc=netloc, server_name=self.name, root=root, wsgi_script=self.wsgi_script_file))
+            else:
+                handle.write(dedent('''
+                    <VirtualHost {netloc.address}:{netloc.port}>
+                        ServerName {server_name}
+                        WSGIScriptAlias / {wsgi_script}
+                    </VirtualHost>
+                ''', netloc=netloc, server_name=self.name, wsgi_script=self.wsgi_script_file))
         logger.info("Activating Apache virtual host ..")
         assert os.system('sudo service apache2 reload') == 0
 
