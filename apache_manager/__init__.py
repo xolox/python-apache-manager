@@ -142,6 +142,16 @@ class ApacheManager(PropertyManager):
         """
         return PORTS_CONF
 
+    @mutable_property
+    def hanging_worker_threshold(self):
+        """
+        The number of seconds before an active worker is considered 'hanging' (a number).
+
+        This property is used to compute :attr:`~ApacheManager.hanging_workers`.
+        It defaults to :data:`HANGING_WORKER_THRESHOLD`.
+        """
+        return HANGING_WORKER_THRESHOLD
+
     @cached_property
     def listen_addresses(self):
         """
@@ -381,9 +391,9 @@ class ApacheManager(PropertyManager):
 
         This property's value is based on :attr:`workers` but excludes workers
         that aren't active and workers whose 'seconds since the beginning of
-        the current request' is lower than :data:`HANGING_WORKER_THRESHOLD`.
+        the current request' is lower than :attr:`hanging_worker_threshold`.
         """
-        return [ws for ws in self.workers if ws.is_active and ws.ss >= HANGING_WORKER_THRESHOLD]
+        return [ws for ws in self.workers if ws.is_active and ws.ss >= self.hanging_worker_threshold]
 
     @cached_property
     def killable_workers(self):

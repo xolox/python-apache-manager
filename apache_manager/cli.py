@@ -1,7 +1,7 @@
 # Monitor and control Apache web server workers from Python.
 #
 # Author: Peter Odding <peter@peterodding.com>
-# Last Change: February 15, 2017
+# Last Change: March 29, 2018
 # URL: https://apache-manager.readthedocs.io
 
 """
@@ -36,6 +36,11 @@ Supported options:
     request" is greater than specified by the TIMESPAN argument. TIMESPAN is
     expected to be a human readable timespan like 2s (2 seconds), 3m (3
     minutes), 5h (5 hours), 2d (2 days), etc.
+
+  -T, --hanging-worker-threshold=TIMESPAN
+
+    Change the number of seconds before an active worker is considered hanging
+    to TIMESPAN (see --max-time for acceptable values of TIMESPAN).
 
   -f, --data-file=PATH
 
@@ -110,12 +115,14 @@ def main():
     watch = False
     zabbix_discovery = False
     verbosity = 0
+    kw = dict()
     # Parse the command line options.
     try:
-        options, arguments = getopt.getopt(sys.argv[1:], 'wa:i:t:f:znvqh', [
+        options, arguments = getopt.getopt(sys.argv[1:], 'wa:i:t:T:f:znvqh', [
             'watch', 'max-memory-active=', 'max-memory-idle=', 'max-ss=',
-            'max-time=', 'data-file=', 'zabbix-discovery', 'dry-run',
-            'simulate', 'verbose', 'quiet', 'help',
+            'max-time=', 'hanging-worker-threshold=', 'data-file=',
+            'zabbix-discovery', 'dry-run', 'simulate', 'verbose', 'quiet',
+            'help',
         ])
         for option, value in options:
             if option in ('-w', '--watch'):
@@ -126,6 +133,8 @@ def main():
                 max_memory_idle = parse_size(value)
             elif option in ('-t', '--max-ss', '--max-time'):
                 max_ss = parse_timespan(value)
+            elif option in ('-T', '--hanging-worker-threshold'):
+                kw['hanging_worker_threshold'] = parse_timespan(value)
             elif option in ('-f', '--data-file'):
                 data_file = value
             elif option in ('-z', '--zabbix-discovery'):
@@ -146,7 +155,7 @@ def main():
         sys.stderr.write("Error: %s!\n" % e)
         sys.exit(1)
     # Execute the requested action(s).
-    manager = ApacheManager()
+    manager = ApacheManager(**kw)
     try:
         if max_memory_active or max_memory_idle or max_ss:
             manager.kill_workers(
