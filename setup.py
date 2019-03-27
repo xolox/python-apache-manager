@@ -3,7 +3,7 @@
 # Setup script for the `apache-manager' package.
 #
 # Author: Peter Odding <peter@peterodding.com>
-# Last Change: February 14, 2017
+# Last Change: March 27, 2019
 # URL: https://apache-manager.readthedocs.io
 
 """
@@ -67,6 +67,7 @@ setup(
     url='https://apache-manager.readthedocs.io',
     author="Peter Odding",
     author_email='peter@peterodding.com',
+    license='MIT',
     packages=find_packages(),
     test_suite='apache_manager.tests',
     install_requires=get_requirements('requirements.txt'),
