@@ -34,3 +34,7 @@ pycparser < 2.19 ; python_version < '2.7'
 
 # idna 2.8 drops Python 2.6 compatibility (not documented).
 idna < 2.8 ; python_version < '2.7'
+
+# BeautifulSoup 4.5.0 drops Python 2.6 compatibility:
+# https://bazaar.launchpad.net/~leonardr/beautifulsoup/bs4/view/head:/CHANGELOG
+beautifulsoup4 < 4.5.0 ; python_version < '2.7'
