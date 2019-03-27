@@ -1,7 +1,7 @@
 # Monitor and control Apache web server workers from Python.
 #
 # Author: Peter Odding <peter@peterodding.com>
-# Last Change: March 6, 2017
+# Last Change: March 27, 2019
 # URL: https://apache-manager.readthedocs.io
 
 """Test suite for the `apache-manager` project."""
@@ -168,10 +168,23 @@ class ApacheManagerTestCase(unittest.TestCase):
         assert manager.manager_metrics['workers_killed_active'] >= 0
         assert manager.manager_metrics['workers_killed_idle'] >= 0
 
-    def test_server_metrics(self):
-        """Test that server metrics parsing works."""
+    def test_server_uptime(self):
+        """
+        Test that server metrics parsing works (based on the uptime).
+
+        This test verifies that the uptime increases after a second. It doubles
+        as a regression test against a bug that was exposed the first time
+        apache-manager was run on an Ubuntu 18.04 system with a newer Apache
+        version that changed the format of the status page, causing buggy
+        regular expression matching (caused by lack of anchoring).
+        """
         manager = ApacheManager()
-        assert manager.server_metrics['uptime'] > 0
+        initial_uptime = manager.server_metrics['uptime']
+        assert initial_uptime > 0
+        time.sleep(2)
+        manager.refresh()
+        later_uptime = manager.server_metrics['uptime']
+        assert later_uptime > initial_uptime
 
     def test_memory_usage(self):
         """Test that memory usage analysis works."""

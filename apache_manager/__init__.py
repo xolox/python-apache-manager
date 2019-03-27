@@ -1,7 +1,7 @@
 # Monitor and control Apache web server workers from Python.
 #
 # Author: Peter Odding <peter@peterodding.com>
-# Last Change: March 6, 2017
+# Last Change: March 27, 2019
 # URL: https://apache-manager.readthedocs.io
 
 """The :mod:`apache_manager` module defines the core logic of the Apache manager."""
@@ -452,23 +452,23 @@ class ApacheManager(PropertyManager):
         logger.debug("Extracting metrics from Apache's plain text status page ..")
         return dict(
             # Example: "Total Accesses: 49038"
-            total_accesses=int(self.extract_metric(r'Total Accesses: (\d+)')),
+            total_accesses=int(self.extract_metric(r'^Total Accesses: (\d+)')),
             # Example: "Total kBytes: 169318"
-            total_traffic=int(self.extract_metric(r'Total KBytes: (\d+)')) * 1024,
+            total_traffic=int(self.extract_metric(r'^Total KBytes: (\d+)')) * 1024,
             # Example: "CPULoad: 7.03642"
-            cpu_load=float(self.extract_metric(r'CPULoad: ([0-9.]+)')),
+            cpu_load=float(self.extract_metric(r'^CPULoad: ([0-9.]+)')),
             # Example: "Uptime: 85017"
-            uptime=int(self.extract_metric(r'Uptime: (\d+)')),
+            uptime=int(self.extract_metric(r'^Uptime: (\d+)')),
             # Example: "ReqPerSec: .576802"
-            requests_per_second=float(self.extract_metric(r'ReqPerSec: ([0-9.]+)')),
+            requests_per_second=float(self.extract_metric(r'^ReqPerSec: ([0-9.]+)')),
             # Example: "BytesPerSec: 2039.38"
-            bytes_per_second=float(self.extract_metric(r'BytesPerSec: ([0-9.]+)')),
+            bytes_per_second=float(self.extract_metric(r'^BytesPerSec: ([0-9.]+)')),
             # Example: "BytesPerReq: 3535.66"
-            bytes_per_request=float(self.extract_metric(r'BytesPerReq: ([0-9.]+)')),
+            bytes_per_request=float(self.extract_metric(r'^BytesPerReq: ([0-9.]+)')),
             # Example: "BusyWorkers: 2"
-            busy_workers=int(self.extract_metric(r'BusyWorkers: (\d+)')),
+            busy_workers=int(self.extract_metric(r'^BusyWorkers: (\d+)')),
             # Example: "IdleWorkers: 6"
-            idle_workers=int(self.extract_metric(r'IdleWorkers: (\d+)')),
+            idle_workers=int(self.extract_metric(r'^IdleWorkers: (\d+)')),
         )
 
     def extract_metric(self, pattern, default='0'):
@@ -487,7 +487,7 @@ class ApacheManager(PropertyManager):
         pattern.
         """
         modified_pattern = re.sub(r'\s+', r'\s+', pattern)
-        match = re.search(modified_pattern, self.text_status, re.IGNORECASE)
+        match = re.search(modified_pattern, self.text_status, re.IGNORECASE | re.MULTILINE)
         if match:
             logger.debug("Pattern '%s' matched '%s'.", pattern, match.group(0))
             return match.group(1)
