@@ -4,3 +4,4 @@ humanfriendly >= 2.4
 proc >= 0.12
 property-manager >= 2.1
 six >= 1.9.0
+update-dotdee >= 5.0

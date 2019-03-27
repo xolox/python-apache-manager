@@ -95,6 +95,8 @@ server metrics and memory usage of workers are printed to the terminal.
    request"" is greater than specified by the ``TIMESPAN`` argument. ``TIMESPAN`` is
    expected to be a human readable timespan like 2s (2 seconds), 3m (3
    minutes), 5h (5 hours), 2d (2 days), etc."
+   "``-T``, ``--hanging-worker-threshold=TIMESPAN``","Change the number of seconds before an active worker is considered hanging
+   to ``TIMESPAN`` (see ``--max-time`` for acceptable values of ``TIMESPAN``)."
    "``-f``, ``--data-file=PATH``","Change the pathname of the file where the Apache manager stores monitoring
    metrics after every run. Defaults to ""/tmp/apache-manager.txt""."
    "``-z``, ``--zabbix-discovery``","Generate a JSON fragment that's compatible with the low-level discovery

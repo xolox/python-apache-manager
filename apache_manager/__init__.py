@@ -13,7 +13,7 @@ import re
 
 # External dependencies.
 from bs4 import BeautifulSoup
-from humanfriendly import compact, concatenate, format_size, format_timespan, pluralize, Timer
+from humanfriendly import compact, concatenate, format_size, format_timespan, parse_timespan, pluralize, Timer
 from proc.apache import find_apache_memory_usage, find_apache_workers
 from proc.core import Process
 from property_manager import (
@@ -26,6 +26,7 @@ from property_manager import (
 )
 from six.moves.urllib.error import HTTPError
 from six.moves.urllib.request import urlopen
+from update_dotdee import ConfigLoader
 
 # Modules included in our package.
 from apache_manager.exceptions import AddressDiscoveryError, StatusPageError
@@ -48,6 +49,9 @@ __all__ = (
     'NonNativeWorker',
     'WorkerStatus',
 )
+
+CONFIG_NAME = 'apache-manager'
+"""The program name used to load configuration files (a string)."""
 
 PORTS_CONF = '/etc/apache2/ports.conf'
 """
@@ -113,6 +117,44 @@ class ApacheManager(PropertyManager):
             kw['ports_config'] = args.pop(0)
         super(ApacheManager, self).__init__(*args, **kw)
 
+    @lazy_property
+    def config(self):
+        """A dictionary with general user defined configuration options."""
+        if CONFIG_NAME in self.config_loader.section_names:
+            return self.config_loader.get_options(CONFIG_NAME)
+        return {}
+
+    @lazy_property
+    def config_loader(self):
+        r"""
+        An :class:`~update_dotdee.ConfigLoader` object that provides access to the configuration.
+
+        .. [[[cog
+        .. from update_dotdee import inject_documentation
+        .. inject_documentation(program_name='apache-manager')
+        .. ]]]
+
+        Configuration files are text files in the subset of `ini syntax`_ supported by
+        Python's configparser_ module. They can be located in the following places:
+
+        =========  ============================  =================================
+        Directory  Main configuration file       Modular configuration files
+        =========  ============================  =================================
+        /etc       /etc/apache-manager.ini       /etc/apache-manager.d/\*.ini
+        ~          ~/.apache-manager.ini         ~/.apache-manager.d/\*.ini
+        ~/.config  ~/.config/apache-manager.ini  ~/.config/apache-manager.d/\*.ini
+        =========  ============================  =================================
+
+        The available configuration files are loaded in the order given above, so that
+        user specific configuration files override system wide configuration files.
+
+        .. _configparser: https://docs.python.org/3/library/configparser.html
+        .. _ini syntax: https://en.wikipedia.org/wiki/INI_file
+
+        .. [[[end]]]
+        """
+        return ConfigLoader(program_name=CONFIG_NAME)
+
     @writable_property
     def num_killed_active(self):
         """The number of active workers killed by :func:`kill_workers()` (an integer)."""
@@ -147,10 +189,13 @@ class ApacheManager(PropertyManager):
         """
         The number of seconds before an active worker is considered 'hanging' (a number).
 
-        This property is used to compute :attr:`~ApacheManager.hanging_workers`.
-        It defaults to :data:`HANGING_WORKER_THRESHOLD`.
+        This value is used to compute :attr:`~ApacheManager.hanging_workers`.
+        The configuration file option is called ``hanging-worker-threshold``
+        (its value will be parsed by :func:`parse_timespan()`). The default
+        value is :data:`HANGING_WORKER_THRESHOLD`.
         """
-        return HANGING_WORKER_THRESHOLD
+        value = self.config.get('hanging-worker-threshold')
+        return parse_timespan(value) if value else HANGING_WORKER_THRESHOLD
 
     @cached_property
     def listen_addresses(self):
