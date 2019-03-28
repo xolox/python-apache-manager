@@ -1,28 +1,33 @@
-.. include:: ../README.rst
+apache-manager: Monitor and control Apache web server workers from Python
+=========================================================================
 
-API documentation
-=================
-
-This documentation is based on the source code of version |release| of the
-`apache-manager` package. The following modules are available:
+Welcome to the documentation of `apache-manager` version |release|!
+The following sections are available:
 
 .. contents::
    :local:
 
-:mod:`apache_manager`
----------------------
+User documentation
+------------------
 
-.. automodule:: apache_manager
-   :members:
+The readme is the best place to start reading, it's targeted at all users and
+documents the command line interface:
 
-:mod:`apache_manager.interactive`
----------------------------------
+.. toctree::
+   readme.rst
 
-.. automodule:: apache_manager.interactive
-   :members:
+API documentation
+-----------------
 
-:mod:`apache_manager.exceptions`
---------------------------------
+The following API documentation is automatically generated from the source code:
 
-.. automodule:: apache_manager.exceptions
-   :members:
+.. toctree::
+   api.rst
+
+Change log
+----------
+
+The change log lists notable changes to the project:
+
+.. toctree::
+   changelog.rst

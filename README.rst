@@ -72,7 +72,9 @@ Command line
 
 **Usage:** `apache-manager [OPTIONS]`
 
-Command line interface to monitor the Apache web server and kill worker processes that exceed resource thresholds. When no options are given the server metrics and memory usage of workers are printed to the terminal.
+Command line interface to monitor the Apache web server and kill worker
+processes that exceed resource thresholds. When no options are given the
+server metrics and memory usage of workers are printed to the terminal.
 
 **Supported options:**
 
@@ -103,8 +105,7 @@ Command line interface to monitor the Apache web server and kill worker processe
    "``-n``, ``--dry-run``, ``--simulate``",Don't actually kill any Apache workers.
    "``-v``, ``--verbose``",Increase verbosity (can be repeated).
    "``-q``, ``--quiet``",Decrease verbosity (can be repeated).
-   "``-h``, ``--help``","Show this message and exit.
-   "
+   "``-h``, ``--help``",Show this message and exit.
 
 .. [[[end]]]
 
@@ -112,9 +113,9 @@ Contact
 -------
 
 The latest version of `apache-manager` is available on PyPI_ and GitHub_. The
-documentation is hosted on `Read the Docs`_. For bug reports please create an
-issue on GitHub_. If you have questions, suggestions, etc. feel free to send me
-an e-mail at `peter@peterodding.com`_.
+documentation is hosted on `Read the Docs`_ and includes a changelog_. For bug
+reports please create an issue on GitHub_. If you have questions, suggestions,
+etc. feel free to send me an e-mail at `peter@peterodding.com`_.
 
 License
 -------
@@ -126,6 +127,7 @@ This software is licensed under the `MIT license`_.
 
 .. External references:
 .. _Apache web server: https://en.wikipedia.org/wiki/Apache_HTTP_Server
+.. _changelog: https://apache-manager.readthedocs.io/en/latest/changelog.html
 .. _documentation: https://apache-manager.readthedocs.io
 .. _GitHub: https://github.com/xolox/python-apache-manager
 .. _metrics: https://en.wikipedia.org/wiki/System_monitoring
