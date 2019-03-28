@@ -11,6 +11,39 @@ to `semantic versioning`_.
 .. _Keep a Changelog: http://keepachangelog.com/
 .. _semantic versioning: http://semver.org/
 
+`Release 1.2`_ (2019-03-28)
+---------------------------
+
+- Added Python 3.6 and 3.7 to test suite and documented support for them (based
+  on the fact that the test suite passes).
+
+- Bug fix to improve compatibility with newer Apache versions:
+
+  In Ubuntu 18.04 the plain text server status page response contains multiple
+  uptime entries and because the regular expressions used by apache-manager
+  weren't anchored to the start of the line, this new status page contents
+  confused apache-manager.
+
+  On Ubuntu 14.04::
+
+   $ curl -s http://localhost/server-status?auto | grep -i uptime
+   Uptime: 96606
+
+  On Ubuntu 18.04::
+
+   $ curl -s http://localhost/server-status?auto | grep -i uptime
+   ServerUptimeSeconds: 5163
+   ServerUptime: 1 hour 26 minutes 3 seconds
+   Uptime: 5163
+
+- Include documentation in source distributions (``MANIFEST.in``).
+
+- Changed Sphinx documentation theme (to the 'nature' theme).
+
+- Added license=MIT to ``setup.py`` script.
+
+.. _Release 1.2: https://github.com/xolox/python-apache-manager/compare/1.1...1.2
+
 `Release 1.1`_ (2017-03-06)
 ---------------------------
 
