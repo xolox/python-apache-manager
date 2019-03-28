@@ -1,7 +1,7 @@
 # Monitor and control Apache web server workers from Python.
 #
 # Author: Peter Odding <peter@peterodding.com>
-# Last Change: March 28, 2019
+# Last Change: November 26, 2019
 # URL: https://apache-manager.readthedocs.io
 
 """The :mod:`apache_manager` module defines the core logic of the Apache manager."""
@@ -839,7 +839,11 @@ class NonNativeWorker(KillableWorker):
 
     def __str__(self):
         """Render a human friendly representation of a non-native Apache worker."""
-        return "non-native worker %i" % self.pid
+        wsgi_process_group = getattr(self.process, 'wsgi_process_group', None)
+        if wsgi_process_group:
+            return "WSGI worker %i (%s)" % (self.pid, wsgi_process_group)
+        else:
+            return "non-native worker %i" % self.pid
 
 
 class WorkerStatus(KillableWorker):
