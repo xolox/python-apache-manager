@@ -1063,24 +1063,6 @@ class WorkerStatus(KillableWorker):
         return "native worker %i (%s)" % (self.pid, "active" if self.is_active else "idle")
 
 
-def parse_status_table(table):
-    """Parse one of the status tables from Apache's HTML status page."""
-    headings = dict((i, normalize_text(coerce_tag(th))) for i, th in enumerate(table.findAll('th')))
-    logger.debug("Parsed table headings: %r", headings)
-    for tr in table.findAll('tr'):
-        values_by_index = [coerce_tag(td) for td in tr.findAll('td')]
-        logger.debug("Parsed values by index: %r", values_by_index)
-        if values_by_index:
-            # Ignore exceptions during coercion.
-            # TODO This can obscure real problems. Find a better way to make it robust!
-            try:
-                values_by_name = dict((headings[i], v) for i, v in enumerate(values_by_index))
-                logger.debug("Parsed values by name: %r", values_by_name)
-                yield values_by_name
-            except Exception:
-                pass
-
-
 def coerce_tag(tag):
     """
     Coerce a BeautifulSoup tag to its string contents (stripped from leading and trailing whitespace).
@@ -1117,3 +1099,21 @@ def normalize_text(value):
         return re.sub('[^a-z0-9]', '', value.lower())
     except Exception:
         return ''
+
+
+def parse_status_table(table):
+    """Parse one of the status tables from Apache's HTML status page."""
+    headings = dict((i, normalize_text(coerce_tag(th))) for i, th in enumerate(table.findAll('th')))
+    logger.debug("Parsed table headings: %r", headings)
+    for tr in table.findAll('tr'):
+        values_by_index = [coerce_tag(td) for td in tr.findAll('td')]
+        logger.debug("Parsed values by index: %r", values_by_index)
+        if values_by_index:
+            # Ignore exceptions during coercion.
+            # TODO This can obscure real problems. Find a better way to make it robust!
+            try:
+                values_by_name = dict((headings[i], v) for i, v in enumerate(values_by_index))
+                logger.debug("Parsed values by name: %r", values_by_name)
+                yield values_by_name
+            except Exception:
+                pass
