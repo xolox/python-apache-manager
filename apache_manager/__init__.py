@@ -117,6 +117,18 @@ class ApacheManager(PropertyManager):
             kw['ports_config'] = args.pop(0)
         super(ApacheManager, self).__init__(*args, **kw)
 
+    @cached_property
+    def combined_memory_usage(self):
+        """
+        The result of :func:`~proc.apache.find_apache_memory_usage()`.
+
+        This property caches the result so that when :attr:`memory_usage` and
+        :attr:`wsgi_process_groups` are both dereferenced, the function
+        :func:`~proc.apache.find_apache_memory_usage()` only has to be called
+        once.
+        """
+        return find_apache_memory_usage()
+
     @lazy_property
     def config(self):
         """A dictionary with general user defined configuration options."""
@@ -155,35 +167,6 @@ class ApacheManager(PropertyManager):
         """
         return ConfigLoader(program_name=CONFIG_NAME)
 
-    @writable_property
-    def num_killed_active(self):
-        """The number of active workers killed by :func:`kill_workers()` (an integer)."""
-        return 0
-
-    @writable_property
-    def num_killed_idle(self):
-        """The number of idle workers killed by :func:`kill_workers()` (an integer)."""
-        return 0
-
-    @writable_property
-    def status_response(self):
-        """
-        Whether the status page was fetched successfully by :func:`fetch_status_page()` (a boolean).
-
-        This will be :data:`None` as long as :attr:`fetch_status_page` hasn't been called.
-        """
-        return None
-
-    @mutable_property
-    def ports_config(self):
-        """
-        The absolute pathname of the ``ports.conf`` configuration file (a string).
-
-        The configuration file is expected to define the port(s) that Apache
-        listens on. Defaults to :data:`PORTS_CONF`.
-        """
-        return PORTS_CONF
-
     @mutable_property
     def hanging_worker_threshold(self):
         """
@@ -196,6 +179,60 @@ class ApacheManager(PropertyManager):
         """
         value = self.config.get('hanging-worker-threshold')
         return parse_timespan(value) if value else HANGING_WORKER_THRESHOLD
+
+    @cached_property
+    def hanging_workers(self):
+        """
+        A list of workers that appear to be 'hanging' (unresponsive).
+
+        :raises: Any exceptions raised by :attr:`html_status` or
+                 :exc:`.StatusPageError` if parsing of the Apache status page
+                 fails.
+
+        This property's value is based on :attr:`workers` but excludes workers
+        that aren't active and workers whose 'seconds since the beginning of
+        the current request' is lower than :attr:`hanging_worker_threshold`.
+        """
+        return [ws for ws in self.workers if ws.is_active and ws.ss >= self.hanging_worker_threshold]
+
+    @cached_property
+    def html_status(self):
+        """
+        The content of Apache's `HTML status page`_ (a string). See also :attr:`text_status`.
+
+        :raises: Any exceptions raised by :func:`fetch_status_page()`.
+
+        .. _HTML status page: http://httpd.apache.org/docs/trunk/mod/mod_status.html
+        """
+        return self.fetch_status_page(self.html_status_url)
+
+    @cached_property(writable=True)
+    def html_status_url(self):
+        """
+        The URL on which Apache's HTML status page can be retrieved (a string).
+
+        :raises: Any exceptions raised by :attr:`listen_addresses`.
+
+        Here's an example:
+
+        >>> from apache_manager import ApacheManager
+        >>> manager = ApacheManager()
+        >>> manager.html_status_url
+        'http://127.0.0.1:80/server-status'
+        """
+        status_url = "%s/server-status" % self.listen_addresses[0].url
+        logger.debug("Discovered Apache HTML status page URL: %s", status_url)
+        return status_url
+
+    @cached_property
+    def killable_workers(self):
+        """A list of :class:`KillableWorker` objects."""
+        all_workers = list(self.workers)
+        native_pids = set(w.pid for w in self.workers)
+        for process in find_apache_workers():
+            if process.pid not in native_pids:
+                all_workers.append(NonNativeWorker(process=process))
+        return sorted(all_workers, key=lambda p: p.pid)
 
     @cached_property
     def listen_addresses(self):
@@ -267,189 +304,6 @@ class ApacheManager(PropertyManager):
                      concatenate(map(str, matched_addresses)))
         return matched_addresses
 
-    @cached_property(writable=True)
-    def html_status_url(self):
-        """
-        The URL on which Apache's HTML status page can be retrieved (a string).
-
-        :raises: Any exceptions raised by :attr:`listen_addresses`.
-
-        Here's an example:
-
-        >>> from apache_manager import ApacheManager
-        >>> manager = ApacheManager()
-        >>> manager.html_status_url
-        'http://127.0.0.1:80/server-status'
-        """
-        status_url = "%s/server-status" % self.listen_addresses[0].url
-        logger.debug("Discovered Apache HTML status page URL: %s", status_url)
-        return status_url
-
-    @cached_property
-    def text_status_url(self):
-        """
-        The URL on which Apache's plain text status page can be retrieved (a string).
-
-        :raises: Any exceptions raised by :attr:`listen_addresses`.
-
-        Here's an example:
-
-        >>> from apache_manager import ApacheManager
-        >>> manager = ApacheManager()
-        >>> manager.text_status_url
-        'http://127.0.0.1:80/server-status?auto'
-        """
-        status_url = "%s?auto" % self.html_status_url
-        logger.debug("Discovered Apache plain text status page URL: %s", status_url)
-        return status_url
-
-    @cached_property
-    def html_status(self):
-        """
-        The content of Apache's `HTML status page`_ (a string). See also :attr:`text_status`.
-
-        :raises: Any exceptions raised by :func:`fetch_status_page()`.
-
-        .. _HTML status page: http://httpd.apache.org/docs/trunk/mod/mod_status.html
-        """
-        return self.fetch_status_page(self.html_status_url)
-
-    @cached_property
-    def text_status(self):
-        """
-        The content of Apache's `plain text status page`_ (a string). See also :attr:`html_status`.
-
-        :raises: Any exceptions raised by :func:`fetch_status_page()`.
-
-        Here's an example:
-
-        >>> from apache_manager import ApacheManager
-        >>> manager = ApacheManager()
-        >>> print manager.text_status
-        Total Accesses: 100
-        Total kBytes: 275
-        CPULoad: .000203794
-        Uptime: 181556
-        ReqPerSec: .000550794
-        BytesPerSec: 1.55104
-        BytesPerReq: 2816
-        BusyWorkers: 1
-        IdleWorkers: 5
-        Scoreboard: ____W._.......................................
-
-        .. _plain text status page: http://httpd.apache.org/docs/trunk/mod/mod_status.html#machinereadable
-        """
-        return self.fetch_status_page(self.text_status_url).decode()
-
-    def fetch_status_page(self, status_url):
-        """
-        Fetch an Apache status page and return its content.
-
-        :param url: The URL of the status page (a string).
-        :returns: The response body (a string).
-        :raises: :exc:`.StatusPageError` if fetching of the status page fails.
-        """
-        timer = Timer()
-        # Get the Apache status page.
-        logger.debug("Fetching Apache status page from %s ..", status_url)
-        try:
-            response = urlopen(status_url)
-        except HTTPError as e:
-            # These objects can be treated as response objects.
-            response = e
-        # Validate the HTTP response status.
-        response_code = response.getcode()
-        if response_code != 200:
-            # Record the failure.
-            self.status_response = False
-            # Notify the caller using a custom exception.
-            raise StatusPageError(compact("""
-                Failed to retrieve Apache status page from {url}! Expected to
-                get HTTP response status 200, got {code} instead.
-            """, url=status_url, code=response_code))
-        response_body = response.read()
-        logger.debug("Fetched %s in %s.", format_size(len(response_body)), timer)
-        self.status_response = True
-        return response_body
-
-    @cached_property
-    def slots(self):
-        """
-        The status of Apache workers (a list of :class:`WorkerStatus` objects).
-
-        :raises: Any exceptions raised by :attr:`html_status` or
-                 :exc:`.StatusPageError` if parsing of the Apache status page
-                 fails.
-
-        The :attr:`slots` property contains one :class:`WorkerStatus` object
-        for each worker "slot" that Apache has allocated. This means that some
-        of the :class:`WorkerStatus` objects may not have expected properties
-        like :attr:`~WorkerStatus.pid` because they describe an "empty slot".
-        See the :attr:`workers` property for a list of :class:`WorkerStatus`
-        objects without empty slots.
-        """
-        # Use BeautifulSoup to parse the HTML response body.
-        soup = BeautifulSoup(self.html_status, "html.parser")
-        # Prepare a list of normalized column headings expected to be defined in the table.
-        required_columns = [normalize_text(c) for c in STATUS_COLUMNS]
-        # Check each table on the Apache status page, because different
-        # multiprocessing modules result in a status page with a different
-        # number of tables and the table with worker details is not clearly
-        # marked as such in the HTML output ...
-        for table in soup.findAll('table'):
-            # Parse the table into a list of dictionaries, one for each row.
-            matched_rows = list(parse_status_table(table))
-            # Filter out rows that don't contain the required columns.
-            validated_rows = [r for r in matched_rows if all(c in r for c in required_columns)]
-            # If one or more rows remain we found the right table! :-)
-            if validated_rows:
-                return [WorkerStatus(status_fields=f) for f in validated_rows]
-        raise StatusPageError(compact("""
-            Failed to parse Apache status page! No tables found containing all
-            of the required column headings and at least one row of data that
-            could be parsed.
-        """))
-
-    @cached_property
-    def workers(self):
-        """
-        The status of the Apache workers, a list of :class:`WorkerStatus` objects.
-
-        :raises: Any exceptions raised by :attr:`html_status` or
-                 :exc:`.StatusPageError` if parsing of the Apache status page
-                 fails.
-
-        This property's value is based on :attr:`slots` but excludes empty
-        slots (i.e. every :class:`WorkerStatus` object in :attr:`workers` will
-        have expected properties like :attr:`~WorkerStatus.pid`).
-        """
-        return [ws for ws in self.slots if ws.m != '.']
-
-    @cached_property
-    def hanging_workers(self):
-        """
-        A list of workers that appear to be 'hanging' (unresponsive).
-
-        :raises: Any exceptions raised by :attr:`html_status` or
-                 :exc:`.StatusPageError` if parsing of the Apache status page
-                 fails.
-
-        This property's value is based on :attr:`workers` but excludes workers
-        that aren't active and workers whose 'seconds since the beginning of
-        the current request' is lower than :attr:`hanging_worker_threshold`.
-        """
-        return [ws for ws in self.workers if ws.is_active and ws.ss >= self.hanging_worker_threshold]
-
-    @cached_property
-    def killable_workers(self):
-        """A list of :class:`KillableWorker` objects."""
-        all_workers = list(self.workers)
-        native_pids = set(w.pid for w in self.workers)
-        for process in find_apache_workers():
-            if process.pid not in native_pids:
-                all_workers.append(NonNativeWorker(process=process))
-        return sorted(all_workers, key=lambda p: p.pid)
-
     @property
     def manager_metrics(self):
         """
@@ -482,6 +336,50 @@ class ApacheManager(PropertyManager):
                     workers_killed_active=self.num_killed_active,
                     workers_killed_idle=self.num_killed_idle,
                     status_response=self.status_response)
+
+    @cached_property
+    def memory_usage(self):
+        """
+        The memory usage of the Apache workers (a :class:`~proc.apache.StatsList` object).
+
+        Based on :func:`proc.apache.find_apache_memory_usage()`. See also
+        :attr:`wsgi_process_groups`.
+
+        Here's an example:
+
+        >>> from apache_manager import ApacheManager
+        >>> from pprint import pprint
+        >>> manager = ApacheManager()
+        >>> pprint(manager.memory_usage)
+        [13697024, 466776064, 735391744, 180432896, 465453056]
+        >>> print(manager.memory_usage.min)
+        13697024
+        >>> print(manager.memory_usage.average)
+        141787428.571
+        >>> print(manager.memory_usage.max)
+        735391744
+        """
+        return self.combined_memory_usage[0]
+
+    @writable_property
+    def num_killed_active(self):
+        """The number of active workers killed by :func:`kill_workers()` (an integer)."""
+        return 0
+
+    @writable_property
+    def num_killed_idle(self):
+        """The number of idle workers killed by :func:`kill_workers()` (an integer)."""
+        return 0
+
+    @mutable_property
+    def ports_config(self):
+        """
+        The absolute pathname of the ``ports.conf`` configuration file (a string).
+
+        The configuration file is expected to define the port(s) that Apache
+        listens on. Defaults to :data:`PORTS_CONF`.
+        """
+        return PORTS_CONF
 
     @cached_property
     def server_metrics(self):
@@ -526,53 +424,112 @@ class ApacheManager(PropertyManager):
             idle_workers=int(self.extract_metric(r'^IdleWorkers: (\d+)')),
         )
 
-    def extract_metric(self, pattern, default='0'):
+    @cached_property
+    def slots(self):
         """
-        Extract a metric from the Apache text status page.
+        The status of Apache workers (a list of :class:`WorkerStatus` objects).
 
-        :param pattern: A regular expression that captures a metric from the
-                        text status page (a string).
-        :param default: The default value to return if the pattern isn't
-                        matched (a string).
-        :returns: The value of the capture group in the matched pattern or the
-                  default value (if the pattern didn't match).
+        :raises: Any exceptions raised by :attr:`html_status` or
+                 :exc:`.StatusPageError` if parsing of the Apache status page
+                 fails.
 
-        This method is a helper for :attr:`server_metrics` that extracts
-        metrics from the Apache text status page based on a regular expression
-        pattern.
+        The :attr:`slots` property contains one :class:`WorkerStatus` object
+        for each worker "slot" that Apache has allocated. This means that some
+        of the :class:`WorkerStatus` objects may not have expected properties
+        like :attr:`~WorkerStatus.pid` because they describe an "empty slot".
+        See the :attr:`workers` property for a list of :class:`WorkerStatus`
+        objects without empty slots.
         """
-        modified_pattern = re.sub(r'\s+', r'\\s+', pattern)
-        match = re.search(modified_pattern, self.text_status, re.IGNORECASE | re.MULTILINE)
-        if match:
-            logger.debug("Pattern '%s' matched '%s'.", pattern, match.group(0))
-            return match.group(1)
-        else:
-            logger.warning("Pattern %r didn't match plain text Apache status page contents!", pattern)
-            return default
+        # Use BeautifulSoup to parse the HTML response body.
+        soup = BeautifulSoup(self.html_status, "html.parser")
+        # Prepare a list of normalized column headings expected to be defined in the table.
+        required_columns = [normalize_text(c) for c in STATUS_COLUMNS]
+        # Check each table on the Apache status page, because different
+        # multiprocessing modules result in a status page with a different
+        # number of tables and the table with worker details is not clearly
+        # marked as such in the HTML output ...
+        for table in soup.findAll('table'):
+            # Parse the table into a list of dictionaries, one for each row.
+            matched_rows = list(parse_status_table(table))
+            # Filter out rows that don't contain the required columns.
+            validated_rows = [r for r in matched_rows if all(c in r for c in required_columns)]
+            # If one or more rows remain we found the right table! :-)
+            if validated_rows:
+                return [WorkerStatus(status_fields=f) for f in validated_rows]
+        raise StatusPageError(compact("""
+            Failed to parse Apache status page! No tables found containing all
+            of the required column headings and at least one row of data that
+            could be parsed.
+        """))
+
+    @writable_property
+    def status_response(self):
+        """
+        Whether the status page was fetched successfully by :func:`fetch_status_page()` (a boolean).
+
+        This will be :data:`None` as long as :attr:`fetch_status_page` hasn't been called.
+        """
+        return None
 
     @cached_property
-    def memory_usage(self):
+    def text_status(self):
         """
-        The memory usage of the Apache workers (a :class:`~proc.apache.StatsList` object).
+        The content of Apache's `plain text status page`_ (a string). See also :attr:`html_status`.
 
-        Based on :func:`proc.apache.find_apache_memory_usage()`. See also
-        :attr:`wsgi_process_groups`.
+        :raises: Any exceptions raised by :func:`fetch_status_page()`.
 
         Here's an example:
 
         >>> from apache_manager import ApacheManager
-        >>> from pprint import pprint
         >>> manager = ApacheManager()
-        >>> pprint(manager.memory_usage)
-        [13697024, 466776064, 735391744, 180432896, 465453056]
-        >>> print(manager.memory_usage.min)
-        13697024
-        >>> print(manager.memory_usage.average)
-        141787428.571
-        >>> print(manager.memory_usage.max)
-        735391744
+        >>> print manager.text_status
+        Total Accesses: 100
+        Total kBytes: 275
+        CPULoad: .000203794
+        Uptime: 181556
+        ReqPerSec: .000550794
+        BytesPerSec: 1.55104
+        BytesPerReq: 2816
+        BusyWorkers: 1
+        IdleWorkers: 5
+        Scoreboard: ____W._.......................................
+
+        .. _plain text status page: http://httpd.apache.org/docs/trunk/mod/mod_status.html#machinereadable
         """
-        return self.combined_memory_usage[0]
+        return self.fetch_status_page(self.text_status_url).decode()
+
+    @cached_property
+    def text_status_url(self):
+        """
+        The URL on which Apache's plain text status page can be retrieved (a string).
+
+        :raises: Any exceptions raised by :attr:`listen_addresses`.
+
+        Here's an example:
+
+        >>> from apache_manager import ApacheManager
+        >>> manager = ApacheManager()
+        >>> manager.text_status_url
+        'http://127.0.0.1:80/server-status?auto'
+        """
+        status_url = "%s?auto" % self.html_status_url
+        logger.debug("Discovered Apache plain text status page URL: %s", status_url)
+        return status_url
+
+    @cached_property
+    def workers(self):
+        """
+        The status of the Apache workers, a list of :class:`WorkerStatus` objects.
+
+        :raises: Any exceptions raised by :attr:`html_status` or
+                 :exc:`.StatusPageError` if parsing of the Apache status page
+                 fails.
+
+        This property's value is based on :attr:`slots` but excludes empty
+        slots (i.e. every :class:`WorkerStatus` object in :attr:`workers` will
+        have expected properties like :attr:`~WorkerStatus.pid`).
+        """
+        return [ws for ws in self.slots if ws.m != '.']
 
     @cached_property
     def wsgi_process_groups(self):
@@ -597,17 +554,60 @@ class ApacheManager(PropertyManager):
         """
         return self.combined_memory_usage[1]
 
-    @cached_property
-    def combined_memory_usage(self):
+    def extract_metric(self, pattern, default='0'):
         """
-        The result of :func:`~proc.apache.find_apache_memory_usage()`.
+        Extract a metric from the Apache text status page.
 
-        This property caches the result so that when :attr:`memory_usage` and
-        :attr:`wsgi_process_groups` are both dereferenced, the function
-        :func:`~proc.apache.find_apache_memory_usage()` only has to be called
-        once.
+        :param pattern: A regular expression that captures a metric from the
+                        text status page (a string).
+        :param default: The default value to return if the pattern isn't
+                        matched (a string).
+        :returns: The value of the capture group in the matched pattern or the
+                  default value (if the pattern didn't match).
+
+        This method is a helper for :attr:`server_metrics` that extracts
+        metrics from the Apache text status page based on a regular expression
+        pattern.
         """
-        return find_apache_memory_usage()
+        modified_pattern = re.sub(r'\s+', r'\\s+', pattern)
+        match = re.search(modified_pattern, self.text_status, re.IGNORECASE | re.MULTILINE)
+        if match:
+            logger.debug("Pattern '%s' matched '%s'.", pattern, match.group(0))
+            return match.group(1)
+        else:
+            logger.warning("Pattern %r didn't match plain text Apache status page contents!", pattern)
+            return default
+
+    def fetch_status_page(self, status_url):
+        """
+        Fetch an Apache status page and return its content.
+
+        :param url: The URL of the status page (a string).
+        :returns: The response body (a string).
+        :raises: :exc:`.StatusPageError` if fetching of the status page fails.
+        """
+        timer = Timer()
+        # Get the Apache status page.
+        logger.debug("Fetching Apache status page from %s ..", status_url)
+        try:
+            response = urlopen(status_url)
+        except HTTPError as e:
+            # These objects can be treated as response objects.
+            response = e
+        # Validate the HTTP response status.
+        response_code = response.getcode()
+        if response_code != 200:
+            # Record the failure.
+            self.status_response = False
+            # Notify the caller using a custom exception.
+            raise StatusPageError(compact("""
+                Failed to retrieve Apache status page from {url}! Expected to
+                get HTTP response status 200, got {code} instead.
+            """, url=status_url, code=response_code))
+        response_body = response.read()
+        logger.debug("Fetched %s in %s.", format_size(len(response_body)), timer)
+        self.status_response = True
+        return response_body
 
     def kill_workers(self, max_memory_active=0, max_memory_idle=0, timeout=0, dry_run=False):
         """
@@ -672,6 +672,10 @@ class ApacheManager(PropertyManager):
             logger.info("No Apache workers killed (found %s within resource usage limits).",
                         pluralize(num_checked, "worker"))
         return list(killed)
+
+    def refresh(self):
+        """Clear cached properties so that their values are recomputed when dereferenced."""
+        self.clear_cached_properties()
 
     def save_metrics(self, data_file):
         """
@@ -759,10 +763,6 @@ class ApacheManager(PropertyManager):
             with open(temporary_file, 'w') as handle:
                 handle.write('\n'.join(output) + '\n')
             os.rename(temporary_file, data_file)
-
-    def refresh(self):
-        """Clear cached properties so that their values are recomputed when dereferenced."""
-        self.clear_cached_properties()
 
 
 class NetworkAddress(PropertyManager):
