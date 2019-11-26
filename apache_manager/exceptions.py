@@ -1,7 +1,7 @@
 # Monitor and control Apache web server workers from Python.
 #
 # Author: Peter Odding <peter@peterodding.com>
-# Last Change: May 27, 2016
+# Last Change: November 26, 2019
 # URL: https://apache-manager.readthedocs.io
 
 """
@@ -19,9 +19,9 @@ class ApacheManagerError(Exception):
 
 class AddressDiscoveryError(ApacheManagerError):
 
-    """Raised by :attr:`.ApacheManager.listen_addresses` when port discovery fails."""
+    """Raised by :attr:`~apache_manager.ApacheManager.listen_addresses` when port discovery fails."""
 
 
 class StatusPageError(ApacheManagerError):
 
-    """Raised by :attr:`.ApacheManager.workers` when the status page can't be retrieved."""
+    """Raised by :attr:`~apache_manager.ApacheManager.workers` when the status page can't be retrieved."""

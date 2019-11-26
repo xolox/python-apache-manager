@@ -191,8 +191,8 @@ class ApacheManager(PropertyManager):
 
         This value is used to compute :attr:`~ApacheManager.hanging_workers`.
         The configuration file option is called ``hanging-worker-threshold``
-        (its value will be parsed by :func:`parse_timespan()`). The default
-        value is :data:`HANGING_WORKER_THRESHOLD`.
+        (its value will be parsed by :func:`~humanfriendly.parse_timespan()`).
+        The default value is :data:`HANGING_WORKER_THRESHOLD`.
         """
         value = self.config.get('hanging-worker-threshold')
         return parse_timespan(value) if value else HANGING_WORKER_THRESHOLD
@@ -631,8 +631,8 @@ class ApacheManager(PropertyManager):
         - The number of seconds since the beginning of the most recent request
           is measured using :attr:`WorkerStatus.ss`.
         - Worker processes are killed using the
-          :func:`~proc.core.Process.kill()` method of the
-          :class:`proc.core.Process` class.
+          :meth:`executor.process.ControllableProcess.kill()`
+          method.
 
         See also :attr:`num_killed_active` and :attr:`num_killed_idle`.
         """
@@ -854,7 +854,7 @@ class KillableWorker(PropertyManager):
         The :class:`proc.core.Process` object for this worker process (or :data:`None`).
 
         If :attr:`pid` is set then the value of :attr:`process` defaults to the
-        result of :func:`proc.core.Process.from_pid()`. If the worker process
+        result of :meth:`proc.core.Process.from_pid()`. If the worker process
         disappears before the process information is requested :attr:`process`
         will be :data:`None`.
         """
