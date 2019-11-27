@@ -1,7 +1,7 @@
 # Monitor and control Apache web server workers from Python.
 #
 # Author: Peter Odding <peter@peterodding.com>
-# Last Change: March 27, 2019
+# Last Change: November 27, 2019
 # URL: https://apache-manager.readthedocs.io
 
 """Test suite for the `apache-manager` project."""
@@ -238,8 +238,8 @@ class ApacheManagerTestCase(unittest.TestCase):
         if os.getuid() != 0:
             logger.warning("Skipping test that kills active workers (superuser privileges are required)")
             return
-        pid_file = os.path.join(tempfile.gettempdir(), 'apache-manager-worker-pid.txt')
-        with TemporaryWSGIApp('wsgi-memory-hog') as context:
+        with tempfile.NamedTemporaryFile() as pid_file, TemporaryWSGIApp('wsgi-memory-hog') as context:
+
             # Create a WSGI application that keeps allocating memory but never returns.
             context.install_wsgi_app('''
                 import itertools
@@ -262,19 +262,22 @@ class ApacheManagerTestCase(unittest.TestCase):
                     length = random.randint(1024*512, 1024*1024)
                     characters = string.ascii_letters + string.digits
                     return ''.join(random.choice(characters) for i in range(length))
-            ''', pid_file=repr(pid_file))
+            ''', pid_file=repr(pid_file.name))
+
             # Activate the WSGI application by making a request.
             context.make_request()
-            # Make sure the PID file was created.
-            assert os.path.isfile(pid_file), compact("""
-                It looks like the WSGI application (affectionately called
-                "memory hog" :-) never got a chance to run! Please review the
-                messages Apache emitted when its configuration was reloaded to
-                pinpoint the cause of this issue.
-            """)
+
             # Get the PID of the Apache worker handling the request.
-            with open(pid_file) as handle:
-                worker_pid = int(handle.read())
+            try:
+                with open(pid_file.name) as handle:
+                    worker_pid = int(handle.read())
+            except Exception:
+                raise Exception(compact("""
+                    It looks like the WSGI application (affectionately called
+                    "memory hog" :-) never got a chance to run! Please review the
+                    messages Apache emitted when its configuration was reloaded to
+                    pinpoint the cause of this issue.
+                """)
 
             # Use the Apache manager to kill the worker handling the request.
             def kill_active_worker():
@@ -290,8 +293,8 @@ class ApacheManagerTestCase(unittest.TestCase):
         if os.getuid() != 0:
             logger.warning("Skipping test that kills workers that time out (superuser privileges are required)")
             return
-        pid_file = os.path.join(tempfile.gettempdir(), 'apache-manager-worker-pid.txt')
-        with TemporaryWSGIApp('wsgi-timeout') as context:
+        with tempfile.NamedTemporaryFile() as pid_file, TemporaryWSGIApp('wsgi-timeout') as context:
+
             # Create a WSGI application that doesn't allocate too much memory but never returns.
             context.install_wsgi_app('''
                 import itertools
@@ -307,19 +310,22 @@ class ApacheManagerTestCase(unittest.TestCase):
                     # Waste time doing nothing ;-).
                     for i in itertools.count():
                         time.sleep(1)
-            ''', pid_file=repr(pid_file))
+            ''', pid_file=repr(pid_file.name))
+
             # Activate the WSGI application by making a request.
             context.make_request()
-            # Make sure the PID file was created.
-            assert os.path.isfile(pid_file), compact("""
-                It looks like the WSGI application (called "wsgi-timeout")
-                never got a chance to run! Please review the messages Apache
-                emitted when its configuration was reloaded to pinpoint the
-                cause of this issue.
-            """)
+
             # Get the PID of the Apache worker handling the request.
-            with open(pid_file) as handle:
-                worker_pid = int(handle.read())
+            try:
+                with open(pid_file.name) as handle:
+                    worker_pid = int(handle.read())
+            except Exception:
+                raise Exception(compact("""
+                    It looks like the WSGI application (called "wsgi-timeout")
+                    never got a chance to run! Please review the messages Apache
+                    emitted when its configuration was reloaded to pinpoint the
+                    cause of this issue.
+                """)
 
             # Use the Apache manager to kill the worker handling the request.
             def kill_timeout_worker():
