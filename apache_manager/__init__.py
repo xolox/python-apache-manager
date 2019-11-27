@@ -13,7 +13,16 @@ import re
 
 # External dependencies.
 from bs4 import BeautifulSoup
-from humanfriendly import compact, concatenate, format_size, format_timespan, parse_timespan, pluralize, Timer
+from humanfriendly import (
+    compact,
+    concatenate,
+    format_size,
+    format_timespan,
+    parse_size,
+    parse_timespan,
+    pluralize,
+    Timer,
+)
 from proc.apache import find_apache_memory_usage, find_apache_workers
 from proc.core import Process
 from property_manager import (
@@ -131,7 +140,7 @@ class ApacheManager(PropertyManager):
 
     @lazy_property
     def config(self):
-        """A dictionary with general user defined configuration options."""
+        """A dictionary with user defined configuration options."""
         if CONFIG_NAME in self.config_loader.section_names:
             return self.config_loader.get_options(CONFIG_NAME)
         return {}
@@ -164,6 +173,17 @@ class ApacheManager(PropertyManager):
         .. _ini syntax: https://en.wikipedia.org/wiki/INI_file
 
         .. [[[end]]]
+
+        Configuration options are loaded from the ``[apache-manager]`` section.
+        The following options are currently supported:
+
+        ============================  =================================
+        Configuration option          Instance property (documentation)
+        ``hanging-worker-threshold``  :attr:`hanging_worker_threshold`
+        ``max-memory-active``         :attr:`max_memory_active`
+        ``max-memory-idle``           :attr:`max_memory_idle`
+        ``worker-timeout``            :attr:`worker_timeout`
+        ============================  =================================
         """
         return ConfigLoader(program_name=CONFIG_NAME)
 
@@ -336,6 +356,38 @@ class ApacheManager(PropertyManager):
                     workers_killed_active=self.num_killed_active,
                     workers_killed_idle=self.num_killed_idle,
                     status_response=self.status_response)
+
+    @mutable_property
+    def max_memory_active(self):
+        """
+        Memory limit for active Apache worker processes (number of bytes).
+
+        The value of this property defines the maximum number of bytes of
+        memory that active Apache worker processes are allowed to use (an
+        integer) before :func:`kill_workers()` terminates them.
+
+        The configuration file option is called ``max-memory-active``
+        (its value will be parsed by :func:`~humanfriendly.parse_size()`).
+        The default value of 0 disables killing of active workers.
+        """
+        value = self.config.get('max-memory-active')
+        return parse_size(value) if value else 0
+
+    @mutable_property
+    def max_memory_idle(self):
+        """
+        Memory limit for idle Apache worker processes (number of bytes).
+
+        The value of this property defines the maximum number of bytes of
+        memory that idle Apache worker processes are allowed to use (an
+        integer) before :func:`kill_workers()` terminates them.
+
+        The configuration file option is called ``max-memory-idle`` (its value
+        will be parsed by :func:`~humanfriendly.parse_size()`). The default
+        value of 0 disables killing of idle workers.
+        """
+        value = self.config.get('max-memory-idle')
+        return parse_size(value) if value else 0
 
     @cached_property
     def memory_usage(self):
@@ -516,6 +568,22 @@ class ApacheManager(PropertyManager):
         logger.debug("Discovered Apache plain text status page URL: %s", status_url)
         return status_url
 
+    @mutable_property
+    def worker_timeout(self):
+        """
+        Time limit for active requests (number of seconds).
+
+        The value of this property defines the maximum number of seconds that
+        Apache worker processes are allowed to spend on a single request
+        before :func:`kill_workers()` terminates them.
+
+        The configuration file option is called ``worker-timeout`` (its value
+        will be parsed by :func:`~humanfriendly.parse_timespan()`). The default
+        value of 0 disables killing of hanging workers.
+        """
+        value = self.config.get('worker-timeout')
+        return parse_timespan(value) if value else 0
+
     @cached_property
     def workers(self):
         """
@@ -609,18 +677,16 @@ class ApacheManager(PropertyManager):
         self.status_response = True
         return response_body
 
-    def kill_workers(self, max_memory_active=0, max_memory_idle=0, timeout=0, dry_run=False):
+    def kill_workers(self, **options):
         """
         Kill Apache worker processes that exceed resource usage thresholds.
 
-        :param max_memory_active: The maximum number of bytes of memory that
-                                  active Apache worker processes are allowed to
-                                  use (an integer).
-        :param max_memory_idle: The maximum number of bytes of memory that
-                                idle Apache worker processes are allowed to use
-                                (an integer).
-        :param timeout: The maximum number of seconds since the beginning of
-                        the most recent request (a number).
+        :param max_memory_active: Overrides :attr:`max_memory_active`.
+        :param max_memory_idle: Overrides :attr:`max_memory_idle`.
+        :param timeout: Overrides :attr:`worker_timeout`.
+        :param dry_run: :data:`True` disables the killing of workers, so that
+                        the ramifications of running this method become clear
+                        without doing any damage (defaults to :data:`False`).
         :returns: A list of integers with process ids of killed workers.
 
         Some implementation notes about this method:
@@ -638,6 +704,11 @@ class ApacheManager(PropertyManager):
         """
         killed = set()
         num_checked = 0
+        dry_run = options.get('dry_run', False)
+        # Use configured values for thresholds not specified by the caller.
+        max_memory_active = options.get('max_memory_active', self.max_memory_active)
+        max_memory_idle = options.get('max_memory_idle', self.max_memory_idle)
+        timeout = options.get('timeout', self.worker_timeout)
         for worker in self.killable_workers:
             # Depending on the multiprocessing module in use multiple workers
             # may be using the same OS process. We leave it up to the caller
