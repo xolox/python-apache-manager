@@ -277,7 +277,7 @@ class ApacheManagerTestCase(unittest.TestCase):
                     "memory hog" :-) never got a chance to run! Please review the
                     messages Apache emitted when its configuration was reloaded to
                     pinpoint the cause of this issue.
-                """)
+                """))
 
             # Use the Apache manager to kill the worker handling the request.
             def kill_active_worker():
@@ -325,7 +325,7 @@ class ApacheManagerTestCase(unittest.TestCase):
                     never got a chance to run! Please review the messages Apache
                     emitted when its configuration was reloaded to pinpoint the
                     cause of this issue.
-                """)
+                """))
 
             # Use the Apache manager to kill the worker handling the request.
             def kill_timeout_worker():
