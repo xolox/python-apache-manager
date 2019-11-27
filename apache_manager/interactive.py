@@ -1,7 +1,7 @@
 # Monitor and control Apache web server workers from Python.
 #
 # Author: Peter Odding <peter@peterodding.com>
-# Last Change: September 26, 2015
+# Last Change: November 27, 2019
 # URL: https://apache-manager.readthedocs.io
 
 """
@@ -33,18 +33,24 @@ suite and are excluded from coverage calculations because:
 # Standard library modules.
 import curses
 import logging
+import sys
 import time
 
 # External dependencies.
 import coloredlogs
+from humanfriendly.terminal import connected_to_terminal, warning
 
 
 def watch_metrics(manager):
     """Watch Apache web server metrics in a ``top`` like interface."""
-    try:
-        curses.wrapper(redraw_loop, manager)
-    except KeyboardInterrupt:
-        pass
+    if connected_to_terminal(sys.stdout):
+        try:
+            curses.wrapper(redraw_loop, manager)
+        except KeyboardInterrupt:
+            pass
+    else:
+        warning("Error: The 'apache-manager --watch' command requires an interactive terminal!")
+        sys.exit(1)
 
 
 def redraw_loop(screen, manager):

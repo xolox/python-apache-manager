@@ -83,6 +83,12 @@ server metrics and memory usage of workers are printed to the terminal.
    :widths: 30, 70
 
 
+   "``-c``, ``--collect-metrics``","Collect monitoring metrics and store them in a text file to be read
+   by a monitoring system like Zabbix. See also the ``--data-file`` option."
+   "``-k``, ``--kill-workers``","Kill Apache workers exceeding the thresholds given by ``--max-memory-active``,
+   ``--max-memory-idle`` and ``--max-time``. These thresholds can also be defined in
+   configuration files, please refer to the online documentation for details.
+   See also the ``--dry-run`` option."
    "``-w``, ``--watch``","This option causes the Apache manager to redraw the collected metrics once
    every 10 seconds in a ""top"" like interface until interrupted using ""q"" (for
    quite) or Control-C."

@@ -1,7 +1,7 @@
 # Monitor and control Apache web server workers from Python.
 #
 # Author: Peter Odding <peter@peterodding.com>
-# Last Change: November 27, 2019
+# Last Change: February 26, 2020
 # URL: https://apache-manager.readthedocs.io
 
 """Test suite for the `apache-manager` project."""
@@ -345,14 +345,14 @@ class ApacheManagerTestCase(unittest.TestCase):
         """Test killing of idle workers based on memory usage thresholds."""
         def kill_idle_workers(dry_run):
             time.sleep(1)
-            arguments = ['--max-memory-idle=1K']
+            arguments = ['--kill-workers', '--max-memory-idle=1K']
             if dry_run:
                 arguments.insert(0, '--dry-run')
             workers_alive_before = set(w.pid for w in ApacheManager().workers if w.is_alive)
             exit_code, output = run_cli(arguments)
             # Check that one or more worker processes were (simulated to be) killed.
             assert exit_code == 0
-            assert re.search(r'Killing native worker \d+ \(idle\)', output)
+            assert re.search(r'Killing native worker \d+ \(idle\)', output) is not None
             # Check that one or more worker processes actually died?
             if not dry_run:
                 workers_alive_after = set(w.pid for w in ApacheManager().workers if w.is_alive)
@@ -376,7 +376,7 @@ class ApacheManagerTestCase(unittest.TestCase):
 
     def test_system_friendly_cli(self):
         """Test that CLI can report machine readable metrics on standard output."""
-        exit_code, output = run_cli(['--data-file=-'])
+        exit_code, output = run_cli(['--collect-metrics', '--data-file=-'])
         assert exit_code == 0
         expected_tokens = ['uptime', 'workers-killed-active', 'workers-killed-idle']
         assert all(t in output.split() for t in expected_tokens)

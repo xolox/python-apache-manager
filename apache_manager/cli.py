@@ -1,7 +1,7 @@
 # Monitor and control Apache web server workers from Python.
 #
 # Author: Peter Odding <peter@peterodding.com>
-# Last Change: March 29, 2018
+# Last Change: February 26, 2020
 # URL: https://apache-manager.readthedocs.io
 
 """
@@ -12,6 +12,18 @@ processes that exceed resource thresholds. When no options are given the
 server metrics and memory usage of workers are printed to the terminal.
 
 Supported options:
+
+  -c, --collect-metrics
+
+    Collect monitoring metrics and store them in a text file to be read
+    by a monitoring system like Zabbix. See also the --data-file option.
+
+  -k, --kill-workers
+
+    Kill Apache workers exceeding the thresholds given by --max-memory-active,
+    --max-memory-idle and --max-time. These thresholds can also be defined in
+    configuration files, please refer to the online documentation for details.
+    See also the --dry-run option.
 
   -w, --watch
 
@@ -87,12 +99,7 @@ from humanfriendly import (
     parse_timespan,
     pluralize,
 )
-from humanfriendly.terminal import (
-    ansi_wrap,
-    connected_to_terminal,
-    HIGHLIGHT_COLOR,
-    usage,
-)
+from humanfriendly.terminal import HIGHLIGHT_COLOR, ansi_wrap, output, usage
 
 # Modules included in our package.
 from apache_manager import ApacheManager, NATIVE_WORKERS_LABEL
@@ -107,38 +114,38 @@ def main():
     # Configure logging output.
     coloredlogs.install(syslog=True)
     # Command line option defaults.
+    actions = set()
+    kw = dict()
     data_file = '/tmp/apache-manager.txt'
     dry_run = False
-    max_memory_active = None
-    max_memory_idle = None
-    max_ss = None
-    watch = False
-    zabbix_discovery = False
     verbosity = 0
-    kw = dict()
     # Parse the command line options.
     try:
-        options, arguments = getopt.getopt(sys.argv[1:], 'wa:i:t:T:f:znvqh', [
-            'watch', 'max-memory-active=', 'max-memory-idle=', 'max-ss=',
-            'max-time=', 'hanging-worker-threshold=', 'data-file=',
-            'zabbix-discovery', 'dry-run', 'simulate', 'verbose', 'quiet',
-            'help',
+        options, arguments = getopt.getopt(sys.argv[1:], 'ckwa:i:t:T:f:znvqh', [
+            'collect-metrics', 'kill-workers', 'watch', 'max-memory-active=',
+            'max-memory-idle=', 'max-ss=', 'max-time=',
+            'hanging-worker-threshold=', 'data-file=', 'zabbix-discovery',
+            'dry-run', 'simulate', 'verbose', 'quiet', 'help',
         ])
         for option, value in options:
-            if option in ('-w', '--watch'):
-                watch = True
+            if option in ('-c', '--collect-metrics'):
+                actions.add('collect')
+            elif option in ('-k', '--kill-workers'):
+                actions.add('kill')
+            elif option in ('-w', '--watch'):
+                actions.add('watch')
             elif option in ('-a', '--max-memory-active'):
-                max_memory_active = parse_size(value)
+                kw['max_memory_active'] = parse_size(value)
             elif option in ('-i', '--max-memory-idle'):
-                max_memory_idle = parse_size(value)
+                kw['max_memory_idle'] = parse_size(value)
             elif option in ('-t', '--max-ss', '--max-time'):
-                max_ss = parse_timespan(value)
+                kw['worker_timeout'] = parse_timespan(value)
             elif option in ('-T', '--hanging-worker-threshold'):
                 kw['hanging_worker_threshold'] = parse_timespan(value)
             elif option in ('-f', '--data-file'):
                 data_file = value
             elif option in ('-z', '--zabbix-discovery'):
-                zabbix_discovery = True
+                actions.add('discovery')
             elif option in ('-n', '--dry-run', '--simulate'):
                 logger.info("Performing a dry run ..")
                 dry_run = True
@@ -151,30 +158,28 @@ def main():
             elif option in ('-h', '--help'):
                 usage(__doc__)
                 return
+        if arguments:
+            raise Exception("This program doesn't support any positional arguments")
     except Exception as e:
         sys.stderr.write("Error: %s!\n" % e)
         sys.exit(1)
-    # Execute the requested action(s).
     manager = ApacheManager(**kw)
     try:
-        if max_memory_active or max_memory_idle or max_ss:
-            manager.kill_workers(
-                max_memory_active=max_memory_active,
-                max_memory_idle=max_memory_idle,
-                timeout=max_ss,
-                dry_run=dry_run,
-            )
-        elif watch and connected_to_terminal(sys.stdout):
+        # Execute the requested action(s).
+        if 'kill' in actions:
+            manager.kill_workers(dry_run=dry_run)
+        if 'watch' in actions:
             watch_metrics(manager)
-        elif zabbix_discovery:
+        if 'discovery' in actions:
             report_zabbix_discovery(manager)
-        elif data_file != '-' and verbosity >= 0:
+        # Render a summary of monitoring metrics when no action was requested.
+        if not actions and data_file != '-':
             for line in report_metrics(manager):
                 if line_is_heading(line):
                     line = ansi_wrap(line, color=HIGHLIGHT_COLOR)
-                print(line)
+                output(line)
     finally:
-        if (not watch) and (data_file == '-' or not dry_run):
+        if 'collect' in actions and (data_file == '-' or not dry_run):
             manager.save_metrics(data_file)
 
 
@@ -211,7 +216,7 @@ def report_memory_usage(lines, label, memory_usage):
 def report_zabbix_discovery(manager):
     """Enable Zabbix low-level discovery of WSGI application groups."""
     worker_groups = [NATIVE_WORKERS_LABEL] + sorted(manager.wsgi_process_groups.keys())
-    print(json.dumps({'data': [{'{#NAME}': name} for name in worker_groups]}))
+    output(json.dumps({'data': [{'{#NAME}': name} for name in worker_groups]}))
 
 
 def line_is_heading(line):
