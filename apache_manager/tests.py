@@ -7,6 +7,7 @@
 """Test suite for the `apache-manager` project."""
 
 # Standard library modules.
+import itertools
 import logging
 import multiprocessing
 import os
@@ -238,7 +239,7 @@ class ApacheManagerTestCase(unittest.TestCase):
         if os.getuid() != 0:
             logger.warning("Skipping test that kills active workers (superuser privileges are required)")
             return
-        with tempfile.NamedTemporaryFile() as pid_file, TemporaryWSGIApp('wsgi-memory-hog') as context:
+        with TemporaryWSGIApp('wsgi-memory-hog') as context:
 
             # Create a WSGI application that keeps allocating memory but never returns.
             context.install_wsgi_app('''
@@ -262,7 +263,7 @@ class ApacheManagerTestCase(unittest.TestCase):
                     length = random.randint(1024*512, 1024*1024)
                     characters = string.ascii_letters + string.digits
                     return ''.join(random.choice(characters) for i in range(length))
-            ''', pid_file=repr(pid_file.name))
+            ''', pid_file=repr(context.pid_file))
 
             # Activate the WSGI application by making a request.
             context.make_request()
@@ -270,7 +271,7 @@ class ApacheManagerTestCase(unittest.TestCase):
             # Get the PID of the Apache worker handling the request.
             def get_worker_pid():
                 try:
-                    with open(pid_file.name) as handle:
+                    with open(context.pid_file) as handle:
                         return int(handle.read())
                 except Exception:
                     raise AssertionError(compact("""
@@ -295,7 +296,7 @@ class ApacheManagerTestCase(unittest.TestCase):
         if os.getuid() != 0:
             logger.warning("Skipping test that kills workers that time out (superuser privileges are required)")
             return
-        with tempfile.NamedTemporaryFile() as pid_file, TemporaryWSGIApp('wsgi-timeout') as context:
+        with TemporaryWSGIApp('wsgi-timeout') as context:
 
             # Create a WSGI application that doesn't allocate too much memory but never returns.
             context.install_wsgi_app('''
@@ -312,7 +313,7 @@ class ApacheManagerTestCase(unittest.TestCase):
                     # Waste time doing nothing ;-).
                     for i in itertools.count():
                         time.sleep(1)
-            ''', pid_file=repr(pid_file.name))
+            ''', pid_file=repr(context.pid_file))
 
             # Activate the WSGI application by making a request.
             context.make_request()
@@ -320,7 +321,7 @@ class ApacheManagerTestCase(unittest.TestCase):
             # Get the PID of the Apache worker handling the request.
             def get_worker_pid():
                 try:
-                    with open(pid_file.name) as handle:
+                    with open(context.pid_file) as handle:
                         return int(handle.read())
                 except Exception:
                     raise AssertionError(compact("""
@@ -384,13 +385,14 @@ class ApacheManagerTestCase(unittest.TestCase):
 def retry(func, max_time=60):
     """Simple test helper to retry a function until assertions no longer fail."""
     timeout = time.time() + max_time
-    while True:
+    for i in itertools.count():
         try:
             if func() is not False:
                 break
         except AssertionError:
             if time.time() > timeout:
                 raise
+            logger.debug("Retrying function (attempts so far: %i) ..", i)
         time.sleep(1)
 
 
@@ -425,6 +427,7 @@ class TemporaryWSGIApp(object):
         :param name: The name of the WSGI application (a string).
         """
         self.manager = ApacheManager()
+        self.short_name = name
         self.name = 'apache-manager-%s' % name
 
     def install_wsgi_app(self, python_code, *args, **kw):
@@ -444,8 +447,8 @@ class TemporaryWSGIApp(object):
             netloc = self.manager.listen_addresses[0]
             installed_version = execute('dpkg-query', '--show', '--showformat=${Version}', 'apache2', capture=True)
             if NaturalOrderKey(installed_version) >= NaturalOrderKey('2.4'):
-                root = tempfile.gettempdir()
-                handle.write(dedent('''
+                handle.write(dedent(
+                    '''
                     <VirtualHost {netloc.address}:{netloc.port}>
                         ServerName {server_name}
                         WSGIScriptAlias / {wsgi_script}
@@ -453,7 +456,12 @@ class TemporaryWSGIApp(object):
                             Require all granted
                         </Directory>
                     </VirtualHost>
-                ''', netloc=netloc, server_name=self.name, root=root, wsgi_script=self.wsgi_script_file))
+                    ''',
+                    netloc=netloc,
+                    server_name=self.name,
+                    root=os.path.dirname(self.wsgi_script_file),
+                    wsgi_script=self.wsgi_script_file,
+                ))
             else:
                 handle.write(dedent('''
                     <VirtualHost {netloc.address}:{netloc.port}>
@@ -497,7 +505,12 @@ class TemporaryWSGIApp(object):
     @property
     def wsgi_script_file(self):
         """The absolute pathname of the WSGI script file."""
-        return '/tmp/%s.wsgi' % self.name
+        return '/var/lib/apache-manager/%s.wsgi' % self.short_name
+
+    @property
+    def pid_file(self):
+        """The absolute pathname of the PID file."""
+        return '/var/lib/apache-manager/%s.pid' % self.short_name
 
     def __enter__(self):
         """Enter the context (does nothing)."""
@@ -505,7 +518,7 @@ class TemporaryWSGIApp(object):
 
     def __exit__(self, exc_type=None, exc_value=None, traceback=None):
         """Leave the context, cleaning up the configuration files and unloading them from Apache."""
-        for filename in self.virtual_host_file, self.wsgi_script_file:
+        for filename in self.virtual_host_file, self.wsgi_script_file, self.pid_file:
             if os.path.exists(filename):
                 logger.info("Cleaning up temporary file: %s", filename)
                 os.unlink(filename)

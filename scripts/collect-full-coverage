@@ -10,4 +10,7 @@ cat >&2 << EOF
 
 EOF
 
+sudo mkdir -p /var/lib/apache-manager
+sudo chown www-data /var/lib/apache-manager
 sudo $(which py.test) --cov --cov-fail-under=90
+sudo rm -r /var/lib/apache-manager
