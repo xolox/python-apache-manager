@@ -16,7 +16,7 @@ sudo apt-get update -qq
 sudo apt-get install --yes apache2 libapache2-mod-wsgi
 
 # Enable the prefork MPM.
-a2dismod --maintmode --quiet mpm_event
-a2dismod --maintmode --quiet mpm_worker
-a2enmod --maintmode --quiet mpm_prefork
-service apache2 restart
+sudo a2dismod --maintmode --quiet mpm_event
+sudo a2dismod --maintmode --quiet mpm_worker
+sudo a2enmod --maintmode --quiet mpm_prefork
+sudo service apache2 restart
