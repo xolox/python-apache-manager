@@ -268,20 +268,22 @@ class ApacheManagerTestCase(unittest.TestCase):
             context.make_request()
 
             # Get the PID of the Apache worker handling the request.
-            try:
-                with open(pid_file.name) as handle:
-                    worker_pid = int(handle.read())
-            except Exception:
-                raise Exception(compact("""
-                    It looks like the WSGI application (affectionately called
-                    "memory hog" :-) never got a chance to run! Please review the
-                    messages Apache emitted when its configuration was reloaded to
-                    pinpoint the cause of this issue.
-                """))
+            def get_worker_pid():
+                try:
+                    with open(pid_file.name) as handle:
+                        return int(handle.read())
+                except Exception:
+                    raise AssertionError(compact("""
+                        It looks like the WSGI application (affectionately called
+                        "memory hog" :-) never got a chance to run! Please review the
+                        messages Apache emitted when its configuration was reloaded to
+                        pinpoint the cause of this issue.
+                    """))
 
             # Use the Apache manager to kill the worker handling the request.
             def kill_active_worker():
                 manager = ApacheManager()
+                worker_pid = get_worker_pid()
                 killed_processes = manager.kill_workers(max_memory_active=1024 * 1024 * 50)
                 assert worker_pid in killed_processes
 
@@ -316,20 +318,22 @@ class ApacheManagerTestCase(unittest.TestCase):
             context.make_request()
 
             # Get the PID of the Apache worker handling the request.
-            try:
-                with open(pid_file.name) as handle:
-                    worker_pid = int(handle.read())
-            except Exception:
-                raise Exception(compact("""
-                    It looks like the WSGI application (called "wsgi-timeout")
-                    never got a chance to run! Please review the messages Apache
-                    emitted when its configuration was reloaded to pinpoint the
-                    cause of this issue.
-                """))
+            def get_worker_pid():
+                try:
+                    with open(pid_file.name) as handle:
+                        return int(handle.read())
+                except Exception:
+                    raise AssertionError(compact("""
+                        It looks like the WSGI application (called "wsgi-timeout")
+                        never got a chance to run! Please review the messages Apache
+                        emitted when its configuration was reloaded to pinpoint the
+                        cause of this issue.
+                    """))
 
             # Use the Apache manager to kill the worker handling the request.
             def kill_timeout_worker():
                 manager = ApacheManager()
+                worker_pid = get_worker_pid()
                 killed_processes = manager.kill_workers(timeout=30)
                 assert worker_pid in killed_processes
 
