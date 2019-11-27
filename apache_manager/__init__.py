@@ -1,7 +1,7 @@
 # Monitor and control Apache web server workers from Python.
 #
 # Author: Peter Odding <peter@peterodding.com>
-# Last Change: November 26, 2019
+# Last Change: November 27, 2019
 # URL: https://apache-manager.readthedocs.io
 
 """The :mod:`apache_manager` module defines the core logic of the Apache manager."""
@@ -486,7 +486,7 @@ class ApacheManager(PropertyManager):
         metrics from the Apache text status page based on a regular expression
         pattern.
         """
-        modified_pattern = re.sub(r'\s+', r'\s+', pattern)
+        modified_pattern = re.sub(r'\s+', r'\\s+', pattern)
         match = re.search(modified_pattern, self.text_status, re.IGNORECASE | re.MULTILINE)
         if match:
             logger.debug("Pattern '%s' matched '%s'.", pattern, match.group(0))
