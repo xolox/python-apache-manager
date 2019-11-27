@@ -13,4 +13,10 @@ export DEBIAN_FRONTEND=noninteractive
 sudo apt-get update -qq
 
 # Use apt-get to install the Apache webserver and mod_wsgi.
-sudo apt-get install --yes apache2-mpm-prefork libapache2-mod-wsgi
+sudo apt-get install --yes apache2 libapache2-mod-wsgi
+
+# Enable the prefork MPM.
+a2dismod --maintmode --quiet mpm_event
+a2dismod --maintmode --quiet mpm_worker
+a2enmod --maintmode --quiet mpm_prefork
+service apache2 restart
