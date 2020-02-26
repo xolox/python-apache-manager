@@ -77,24 +77,25 @@ class ApacheManagerTestCase(unittest.TestCase):
     def test_port_discovery(self):
         """Test Apache port discovery and error handling."""
         # Test that port discovery raises an exception when ports.conf doesn't exist.
-        config_file = 'this-ports-config-does-not-exist-%i.conf' % os.getpid()
-        manager = ApacheManager(os.path.join(tempfile.gettempdir(), config_file))
+        filename = 'this-ports-config-does-not-exist-%i.conf' % os.getpid()
+        pathname = os.path.join(tempfile.gettempdir(), filename)
+        manager = ApacheManager(ports_config=pathname)
         self.assertRaises(AddressDiscoveryError, lambda: manager.listen_addresses)
         # Test that port discovery raises an exception when parsing of ports.conf fails.
         with tempfile.NamedTemporaryFile() as temporary_file:
-            manager = ApacheManager(temporary_file.name)
+            manager = ApacheManager(ports_config=temporary_file.name)
             self.assertRaises(AddressDiscoveryError, lambda: manager.listen_addresses)
         # Test parsing of `Listen' directives with a port number but no IP address.
         with tempfile.NamedTemporaryFile() as temporary_file:
             with open(temporary_file.name, 'w') as handle:
                 handle.write('Listen 12345\n')
-            manager = ApacheManager(temporary_file.name)
+            manager = ApacheManager(ports_config=temporary_file.name)
             assert any(a.port == 12345 for a in manager.listen_addresses)
         # Test parsing of `Listen' directives with an IP address and port number.
         with tempfile.NamedTemporaryFile() as temporary_file:
             with open(temporary_file.name, 'w') as handle:
                 handle.write('Listen 127.0.0.2:54321\n')
-            manager = ApacheManager(temporary_file.name)
+            manager = ApacheManager(ports_config=temporary_file.name)
             assert any(a.address == '127.0.0.2' and a.port == 54321
                        for a in manager.listen_addresses)
         # Test that port discovery on the host system returns at least one port.

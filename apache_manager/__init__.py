@@ -47,6 +47,7 @@ __version__ = '1.2'
 # Hide internal identifiers from API documentation.
 __all__ = (
     # Configuration defaults.
+    'CONFIG_NAME',
     'HANGING_WORKER_THRESHOLD',
     'IDLE_MODES',
     'NATIVE_WORKERS_LABEL',
@@ -114,18 +115,6 @@ class ApacheManager(PropertyManager):
     for details). The easiest way to invalidate all of these cached properties
     at once is to call the :func:`refresh()` method.
     """
-
-    def __init__(self, *args, **kw):
-        """
-        Initialize a :class:`ApacheManager` object.
-
-        :param args: The first positional argument is used to set
-                     :attr:`ports_config`.
-        """
-        if args:
-            args = list(args)
-            kw['ports_config'] = args.pop(0)
-        super(ApacheManager, self).__init__(*args, **kw)
 
     @cached_property
     def combined_memory_usage(self):
