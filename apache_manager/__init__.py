@@ -24,6 +24,7 @@ from humanfriendly import (
     Timer,
 )
 from humanfriendly.terminal import output
+from humanfriendly.text import generate_slug
 from proc.apache import find_apache_memory_usage, find_apache_workers
 from proc.core import Process
 from property_manager import (
@@ -485,7 +486,7 @@ class ApacheManager(PropertyManager):
         # Use BeautifulSoup to parse the HTML response body.
         soup = BeautifulSoup(self.html_status, "html.parser")
         # Prepare a list of normalized column headings expected to be defined in the table.
-        required_columns = [normalize_text(c) for c in STATUS_COLUMNS]
+        required_columns = [generate_slug(c) for c in STATUS_COLUMNS]
         # Check each table on the Apache status page, because different
         # multiprocessing modules result in a status page with a different
         # number of tables and the table with worker details is not clearly
@@ -1154,17 +1155,9 @@ def coerce_value(type, value):
         return None
 
 
-def normalize_text(value):
-    """Lossy normalization of text values to make string comparisons less fragile."""
-    try:
-        return re.sub('[^a-z0-9]', '', value.lower())
-    except Exception:
-        return ''
-
-
 def parse_status_table(table):
     """Parse one of the status tables from Apache's HTML status page."""
-    headings = dict((i, normalize_text(coerce_tag(th))) for i, th in enumerate(table.findAll('th')))
+    headings = dict((i, generate_slug(coerce_tag(th))) for i, th in enumerate(table.findAll('th')))
     logger.debug("Parsed table headings: %r", headings)
     for tr in table.findAll('tr'):
         values_by_index = [coerce_tag(td) for td in tr.findAll('td')]
