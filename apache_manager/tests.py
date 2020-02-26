@@ -160,29 +160,43 @@ class ApacheManagerTestCase(unittest.TestCase):
         retry(lambda: any(w.is_alive for w in manager.workers))
         retry(lambda: any(w.is_idle for w in manager.workers))
         retry(lambda: any(isinstance(w.acc, tuple)for w in manager.workers))
-        # Validate the WorkerStatus.acc property.
-        worker = manager.workers[0]
-        assert isinstance(worker.acc, tuple)
-        assert len(worker.acc) == 3
-        assert all(isinstance(n, int) for n in worker.acc)
-        # Validate the WorkerStatus.child property.
-        assert isinstance(worker.child, float)
-        # Validate the WorkerStatus.client property.
-        assert isinstance(worker.client, text_type) and worker.client
-        # Validate the WorkerStatus.conn property.
-        assert isinstance(worker.conn, float)
-        # Validate the WorkerStatus.cpu property.
-        assert isinstance(worker.cpu, float)
-        # Validate the WorkerStatus.req property.
-        assert isinstance(worker.req, int)
-        # Validate the WorkerStatus.slot property.
-        assert isinstance(worker.slot, float)
-        # Validate the WorkerStatus.srv property.
-        assert isinstance(worker.srv, tuple)
-        assert len(worker.srv) == 2
-        assert all(isinstance(n, int) for n in worker.srv)
-        # Validate the WorkerStatus.vhost property.
-        assert isinstance(worker.vhost, text_type) and worker.vhost
+        # Validate the worker status properties. Some properties like 'vhost'
+        # may be empty when a large enough number of workers is configured
+        # that some workers are never initialized. To cope with this but
+        # nevertheless validate that each WorkerStatus property can be parsed
+        # successfully, we run the following checks against all known workers
+        # and assert that they pass for at least one worker.
+        assert any(self.check_worker_status(w) for w in manager.workers)
+
+    def check_worker_status(self, worker):
+        """"Try to validate WorkerStatus properties."""
+        try:
+            # Validate the WorkerStatus.acc property.
+            assert isinstance(worker.acc, tuple)
+            assert len(worker.acc) == 3
+            assert all(isinstance(n, int) for n in worker.acc)
+            # Validate the WorkerStatus.child property.
+            assert isinstance(worker.child, float)
+            # Validate the WorkerStatus.client property.
+            assert isinstance(worker.client, text_type) and worker.client
+            # Validate the WorkerStatus.conn property.
+            assert isinstance(worker.conn, float)
+            # Validate the WorkerStatus.cpu property.
+            assert isinstance(worker.cpu, float)
+            # Validate the WorkerStatus.req property.
+            assert isinstance(worker.req, int)
+            # Validate the WorkerStatus.slot property.
+            assert isinstance(worker.slot, float)
+            # Validate the WorkerStatus.srv property.
+            assert isinstance(worker.srv, tuple)
+            assert len(worker.srv) == 2
+            assert all(isinstance(n, int) for n in worker.srv)
+            # Validate the WorkerStatus.vhost property.
+            assert isinstance(worker.vhost, text_type) and worker.vhost
+        except AssertionError:
+            return False
+        else:
+            return True
 
     def test_manager_metrics(self):
         """Test that the Apache manager successfully reports metrics about itself."""
