@@ -1,7 +1,7 @@
 # Monitor and control Apache web server workers from Python.
 #
 # Author: Peter Odding <peter@peterodding.com>
-# Last Change: November 27, 2019
+# Last Change: February 26, 2020
 # URL: https://apache-manager.readthedocs.io
 
 """The :mod:`apache_manager` module defines the core logic of the Apache manager."""
@@ -23,6 +23,7 @@ from humanfriendly import (
     pluralize,
     Timer,
 )
+from humanfriendly.terminal import output
 from proc.apache import find_apache_memory_usage, find_apache_workers
 from proc.core import Process
 from property_manager import (
@@ -800,39 +801,39 @@ class ApacheManager(PropertyManager):
         else:
             logger.debug("Storing metrics in %s ..", data_file)
         # Start with the server metrics.
-        output = ['# Global Apache server metrics.']
+        listing = ['# Global Apache server metrics.']
         for name, value in sorted(self.server_metrics.items()):
-            output.append('%s\t%s' % (name.replace('_', '-'), value))
+            listing.append('%s\t%s' % (name.replace('_', '-'), value))
         # Add our internal metrics.
-        output.extend(['', '# Metrics internal to apache-manager.'])
+        listing.extend(['', '# Metrics internal to apache-manager.'])
         for name, value in sorted(self.manager_metrics.items()):
             if isinstance(value, bool):
                 value = 0 if value else 1
-            output.append('%s\t%s' % (name.replace('_', '-'), value))
+            listing.append('%s\t%s' % (name.replace('_', '-'), value))
         # Add memory usage metrics per group of (WSGI) workers.
         groups = dict(self.wsgi_process_groups)
         ordered_group_names = [NATIVE_WORKERS_LABEL] + sorted(groups.keys())
         groups[NATIVE_WORKERS_LABEL] = self.memory_usage
         metric_names = ('count', 'min', 'max', 'average', 'median')
         for group_name in ordered_group_names:
-            output.append('')
+            listing.append('')
             if group_name == NATIVE_WORKERS_LABEL:
-                output.append('# Memory usage of native Apache worker processes.')
+                listing.append('# Memory usage of native Apache worker processes.')
             else:
-                output.append('# Memory usage of %r WSGI worker processes.' % group_name)
+                listing.append('# Memory usage of %r WSGI worker processes.' % group_name)
             for metric in metric_names:
-                output.append('\t'.join([
+                listing.append('\t'.join([
                     'memory-usage', group_name, metric, str(
                         len(groups[group_name]) if metric == 'count'
                         else getattr(groups[group_name], metric)
                     ),
                 ]))
         if data_file == '-':
-            print('\n'.join(output))
+            output('\n'.join(listing))
         else:
             temporary_file = '%s.tmp' % data_file
             with open(temporary_file, 'w') as handle:
-                handle.write('\n'.join(output) + '\n')
+                handle.write('\n'.join(listing) + '\n')
             os.rename(temporary_file, data_file)
 
 
