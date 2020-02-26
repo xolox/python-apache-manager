@@ -169,7 +169,7 @@ class ApacheManagerTestCase(unittest.TestCase):
         assert any(self.check_worker_status(w) for w in manager.workers)
 
     def check_worker_status(self, worker):
-        """"Try to validate WorkerStatus properties."""
+        """Try to validate WorkerStatus properties."""
         try:
             # Validate the WorkerStatus.acc property.
             assert isinstance(worker.acc, tuple)
