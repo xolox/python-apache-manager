@@ -24,17 +24,21 @@ to `semantic versioning`_.
   weren't anchored to the start of the line, this new status page contents
   confused apache-manager.
 
-  On Ubuntu 14.04::
+  On Ubuntu 14.04:
 
-   $ curl -s http://localhost/server-status?auto | grep -i uptime
-   Uptime: 96606
+  .. code-block:: console
 
-  On Ubuntu 18.04::
+     $ curl -s http://localhost/server-status?auto | grep -i uptime
+     Uptime: 96606
 
-   $ curl -s http://localhost/server-status?auto | grep -i uptime
-   ServerUptimeSeconds: 5163
-   ServerUptime: 1 hour 26 minutes 3 seconds
-   Uptime: 5163
+  On Ubuntu 18.04:
+
+  .. code-block:: console
+
+     $ curl -s http://localhost/server-status?auto | grep -i uptime
+     ServerUptimeSeconds: 5163
+     ServerUptime: 1 hour 26 minutes 3 seconds
+     Uptime: 5163
 
 - Include documentation in source distributions (``MANIFEST.in``).
 
