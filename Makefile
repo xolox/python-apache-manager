@@ -1,12 +1,13 @@
-# Makefile for the `apache-manager' package.
+# Makefile for the 'apache-manager' package.
 #
 # Author: Peter Odding <peter@peterodding.com>
-# Last Change: November 27, 2019
+# Last Change: February 26, 2020
 # URL: https://github.com/xolox/python-apache-manager
 
 PACKAGE_NAME = apache-manager
 WORKON_HOME ?= $(HOME)/.virtualenvs
 VIRTUAL_ENV ?= $(WORKON_HOME)/$(PACKAGE_NAME)
+PYTHON ?= python3
 PATH := $(VIRTUAL_ENV)/bin:$(PATH)
 MAKE := $(MAKE) --no-print-directory
 SHELL = bash
@@ -29,27 +30,28 @@ default:
 
 install:
 	@test -d "$(VIRTUAL_ENV)" || mkdir -p "$(VIRTUAL_ENV)"
-	@test -x "$(VIRTUAL_ENV)/bin/python" || virtualenv --quiet "$(VIRTUAL_ENV)"
+	@test -x "$(VIRTUAL_ENV)/bin/python" || virtualenv --python=$(PYTHON) --quiet "$(VIRTUAL_ENV)"
 	@pip install --quiet --requirement=requirements.txt
 	@pip uninstall --yes $(PACKAGE_NAME) &>/dev/null || true
 	@pip install --quiet --no-deps --ignore-installed .
 
 reset:
-	$(MAKE) clean
-	rm -Rf "$(VIRTUAL_ENV)"
-	$(MAKE) install
+	@$(MAKE) clean
+	@rm -Rf "$(VIRTUAL_ENV)"
+	@$(MAKE) install
 
 check: install
-	@pip install --quiet --requirement=requirements-checks.txt
+	@pip install --upgrade --quiet --requirement=requirements-checks.txt
 	@flake8
 
 test: install
 	@pip install --quiet --requirement=requirements-tests.txt
-	@py.test --cov
-	@coverage html
+	@py.test --cov --cov-report=html --no-cov-on-fail
+	@coverage report --fail-under=90
 
 tox: install
-	@pip install --quiet tox && tox
+	@pip install --quiet tox
+	@tox
 
 # The following makefile target isn't documented on purpose, I don't want
 # people to execute this without them knowing very well what they're doing.
@@ -67,12 +69,12 @@ docs: readme
 	@cd docs && sphinx-build -nb html -d build/doctrees . build/html
 
 publish: install
-	git push origin && git push --tags origin
-	$(MAKE) clean
-	pip install --quiet twine wheel
-	python setup.py sdist bdist_wheel
-	twine upload dist/*
-	$(MAKE) clean
+	@git push origin && git push --tags origin
+	@$(MAKE) clean
+	@pip install --quiet twine wheel
+	@python setup.py sdist bdist_wheel
+	@twine upload dist/*
+	@$(MAKE) clean
 
 clean:
 	@rm -Rf *.egg .cache .coverage .tox build dist docs/build htmlcov
