@@ -178,6 +178,16 @@ class ApacheManager(PropertyManager):
         """
         return ConfigLoader(program_name=CONFIG_NAME)
 
+    @cached_property
+    def foreign_workers(self):
+        """A list of :class:`NonNativeWorker` objects."""
+        native_process_ids = set(w.pid for w in self.workers)
+        return [
+            NonNativeWorker(process=process)
+            for process in find_apache_workers()
+            if process.pid not in native_process_ids
+        ]
+
     @mutable_property
     def hanging_worker_threshold(self):
         """
@@ -237,12 +247,13 @@ class ApacheManager(PropertyManager):
 
     @cached_property
     def killable_workers(self):
-        """A list of :class:`KillableWorker` objects."""
+        """
+        A list of :class:`KillableWorker` objects.
+
+        This combines :attr:`workers` and :attr:`foreign_workers`.
+        """
         all_workers = list(self.workers)
-        native_pids = set(w.pid for w in self.workers)
-        for process in find_apache_workers():
-            if process.pid not in native_pids:
-                all_workers.append(NonNativeWorker(process=process))
+        all_workers.extend(self.foreign_workers)
         return sorted(all_workers, key=lambda p: p.pid)
 
     @cached_property
@@ -326,10 +337,12 @@ class ApacheManager(PropertyManager):
         >>> from pprint import pprint
         >>> manager = ApacheManager()
         >>> pprint(manager.manager_metrics)
-        {'workers_hanging': 0,
+        {'foreign_worker_count': 0,
+         'native_worker_count': 50,
+         'status_response': True,
+         'workers_hanging': 0,
          'workers_killed_active': 0,
-         'workers_killed_idle': 0,
-         'status_response': None}
+         'workers_killed_idle': 0}
 
         Notes about these metrics:
 
@@ -343,10 +356,14 @@ class ApacheManager(PropertyManager):
         - The ``workers_killed_active`` and ``workers_killed_idle`` keys give
           the number of Apache workers killed by :func:`kill_workers()`.
         """
-        return dict(workers_hanging=len(self.hanging_workers),
-                    workers_killed_active=self.num_killed_active,
-                    workers_killed_idle=self.num_killed_idle,
-                    status_response=self.status_response)
+        return dict(
+            foreign_worker_count=len(self.foreign_workers),
+            native_worker_count=len(self.workers),
+            status_response=self.status_response,
+            workers_hanging=len(self.hanging_workers),
+            workers_killed_active=self.num_killed_active,
+            workers_killed_idle=self.num_killed_idle,
+        )
 
     @mutable_property
     def max_memory_active(self):
