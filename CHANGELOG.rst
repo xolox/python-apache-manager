@@ -11,6 +11,60 @@ to `semantic versioning`_.
 .. _Keep a Changelog: http://keepachangelog.com/
 .. _semantic versioning: http://semver.org/
 
+`Release 2.0`_ (2020-02-26)
+---------------------------
+
+**Backwards incompatible changes:**
+
+- Drop support for Python 2.6 and 3.4, start testing on Python 3.8.
+
+- Explicit command line options are now required to enable metrics collection
+  and killing of workers. This was prompted by the following awkward
+  interaction:
+
+  - The command line interface was initially designed such that killing of
+    workers was enabled when thresholds were given as command line options.
+
+  - Since then support for configuration files was added, and given the
+    presence of a configuration file thresholds would always be set so
+    killing would happen implicitly and unconditionally.
+
+  To solve these `explicit is better than implicit`_ contradictions all in one
+  go I decided to make a backwards incompatible change to the command line
+  interface, where both of the actions described above now need to be requested
+  using command line options.
+
+- Parsing of sizes now uses binary multiples of bytes (base-2) for ambiguous
+  unit symbols and names whereas previously decimal multiples of bytes
+  (base-10) were used.
+
+- The custom initializer on the main :class:`~apache_manager.ApacheManager`
+  class was removed because it was a historical artefact whose significance was
+  lost in time.
+
+**Other significant changes:**
+
+- Make the :attr:`~apache_manager.ApacheManager.hanging_worker_threshold`
+  option configurable.
+
+- Add support for configuration files to configure killing of workers (for
+  details see the :attr:`~apache_manager.ApacheManager.config_loader`
+  property).
+
+- Expose native and foreign worker count in data file to enable monitoring that
+  detects configuration issues (like the native worker count being lower than
+  the foreign worker count, causing the native workers to become saturated).
+
+**Miscellaneous changes:**
+
+- Document that Linux is required (`#2`_).
+- Improve string representation of WSGI workers.
+- Use Python 3 for local development in ``Makefile``.
+
+.. _Release 2.0: https://github.com/xolox/python-apache-manager/compare/1.2...2.0
+.. _explicit is better than implicit: https://www.python.org/dev/peps/pep-0020/#the-zen-of-python
+.. _#2: https://github.com/xolox/python-apache-manager/issues/2
+
 `Release 1.2`_ (2019-03-28)
 ---------------------------
 

@@ -43,7 +43,7 @@ from update_dotdee import ConfigLoader
 from apache_manager.exceptions import AddressDiscoveryError, StatusPageError
 
 # Semi-standard module versioning.
-__version__ = '1.2'
+__version__ = '2.0'
 
 # Hide internal identifiers from API documentation.
 __all__ = (
@@ -777,7 +777,10 @@ class ApacheManager(PropertyManager):
             uptime               790212
 
             # Metrics internal to apache-manager.
+            foreign-worker-count   0
+            native-worker-count    50
             status-response        0
+            workers-hanging        0
             workers-killed-active  0
             workers-killed-idle    0
 
