@@ -23,11 +23,12 @@ from capturer import CaptureOutput
 from executor import execute
 from humanfriendly import compact, dedent
 from natsort import NaturalOrderKey
+from property_manager import set_property
 from six import text_type
 from six.moves.urllib.request import Request, urlopen
 
 # Modules included in our package.
-from apache_manager import ApacheManager
+from apache_manager import ApacheManager, coerce_value
 from apache_manager.cli import main
 from apache_manager.exceptions import AddressDiscoveryError, StatusPageError
 
@@ -124,6 +125,26 @@ class ApacheManagerTestCase(unittest.TestCase):
             manager.fetch_status_page,
             manager.html_status_url + "-non-existing-endpoint",
         )
+
+    def test_status_page_parsing_errors(self):
+        """Test what happens when the status page can't be parsed."""
+        manager = ApacheManager()
+        set_property(
+            manager,
+            'html_status',
+            dedent(
+                '''
+                <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+                <title>404 Not Found</title>
+                <h1>Not Found</h1>
+                <p>
+                    The requested URL was not found on the server.
+                    If you entered the URL manually please check your spelling and try again.
+                </p>
+                '''
+            ),
+        )
+        self.assertRaises(StatusPageError, getattr, manager, 'slots')
 
     def test_worker_table_parsing(self):
         """Test that parsing of worker information from the HTML status page works."""
@@ -381,6 +402,14 @@ class ApacheManagerTestCase(unittest.TestCase):
         assert exit_code == 0
         expected_tokens = ['uptime', 'workers-killed-active', 'workers-killed-idle']
         assert all(t in output.split() for t in expected_tokens)
+
+    def test_coerce_value(self):
+        """Test value coercion."""
+        # Test the happy path.
+        assert coerce_value(int, '42') == 42
+        assert coerce_value(float, '3.14') == 3.14
+        # Test the error handling.
+        assert coerce_value(float, '1/5') is None
 
 
 def retry(func, max_time=60):

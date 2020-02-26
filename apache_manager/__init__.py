@@ -512,7 +512,6 @@ class ApacheManager(PropertyManager):
 
         This will be :data:`None` as long as :attr:`fetch_status_page` hasn't been called.
         """
-        return None
 
     @cached_property
     def text_status(self):
