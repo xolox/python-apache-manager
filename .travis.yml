@@ -9,7 +9,7 @@ matrix:
       dist: xenial
     - python: pypy
 before_install:
-  - scripts/install-on-travis.sh
+  - scripts/prepare-travis-ci.sh
 install:
   - pip install --upgrade --requirement=requirements-travis.txt
   - LC_ALL=C pip install .

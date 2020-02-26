@@ -56,7 +56,7 @@ tox: install
 
 full-coverage: install
 	@pip install --quiet --requirement=requirements-tests.txt
-	@scripts/collect-full-coverage
+	@scripts/collect-full-coverage.sh
 	@coverage html
 
 readme: install
