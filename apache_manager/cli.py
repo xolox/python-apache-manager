@@ -99,7 +99,7 @@ from humanfriendly import (
     parse_timespan,
     pluralize,
 )
-from humanfriendly.terminal import HIGHLIGHT_COLOR, ansi_wrap, output, usage
+from humanfriendly.terminal import HIGHLIGHT_COLOR, ansi_wrap, output, usage, warning
 
 # Modules included in our package.
 from apache_manager import ApacheManager, NATIVE_WORKERS_LABEL
@@ -161,7 +161,7 @@ def main():
         if arguments:
             raise Exception("This program doesn't support any positional arguments")
     except Exception as e:
-        sys.stderr.write("Error: %s!\n" % e)
+        warning("Error: %s!", e)
         sys.exit(1)
     manager = ApacheManager(**kw)
     try:
@@ -178,6 +178,9 @@ def main():
                 if line_is_heading(line):
                     line = ansi_wrap(line, color=HIGHLIGHT_COLOR)
                 output(line)
+    except Exception:
+        logger.exception("Encountered unexpected exception, aborting!")
+        sys.exit(1)
     finally:
         if 'collect' in actions and (data_file == '-' or not dry_run):
             manager.save_metrics(data_file)
