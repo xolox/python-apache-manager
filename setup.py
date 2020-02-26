@@ -3,7 +3,7 @@
 # Setup script for the `apache-manager' package.
 #
 # Author: Peter Odding <peter@peterodding.com>
-# Last Change: November 27, 2019
+# Last Change: February 26, 2020
 # URL: https://apache-manager.readthedocs.io
 
 """
@@ -90,6 +90,7 @@ setup(
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: Implementation :: CPython',
         'Programming Language :: Python :: Implementation :: PyPy',
         'Topic :: Internet :: WWW/HTTP :: HTTP Servers',
