@@ -135,9 +135,9 @@ def main():
             elif option in ('-w', '--watch'):
                 actions.add('watch')
             elif option in ('-a', '--max-memory-active'):
-                kw['max_memory_active'] = parse_size(value)
+                kw['max_memory_active'] = parse_size(value, binary=True)
             elif option in ('-i', '--max-memory-idle'):
-                kw['max_memory_idle'] = parse_size(value)
+                kw['max_memory_idle'] = parse_size(value, binary=True)
             elif option in ('-t', '--max-ss', '--max-time'):
                 kw['worker_timeout'] = parse_timespan(value)
             elif option in ('-T', '--hanging-worker-threshold'):

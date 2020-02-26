@@ -362,7 +362,7 @@ class ApacheManager(PropertyManager):
         The default value of 0 disables killing of active workers.
         """
         value = self.config.get('max-memory-active')
-        return parse_size(value) if value else 0
+        return parse_size(value, binary=True) if value else 0
 
     @mutable_property
     def max_memory_idle(self):
@@ -378,7 +378,7 @@ class ApacheManager(PropertyManager):
         value of 0 disables killing of idle workers.
         """
         value = self.config.get('max-memory-idle')
-        return parse_size(value) if value else 0
+        return parse_size(value, binary=True) if value else 0
 
     @cached_property
     def memory_usage(self):

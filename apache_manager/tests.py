@@ -411,6 +411,14 @@ class ApacheManagerTestCase(unittest.TestCase):
         # Test the error handling.
         assert coerce_value(float, '1/5') is None
 
+    def test_max_memory_configuration(self):
+        """Test marshaling of ``max-memory-*`` configuration options."""
+        manager = ApacheManager()
+        manager.config['max-memory-active'] = '500M'
+        manager.config['max-memory-idle'] = '250M'
+        assert manager.max_memory_active == 524288000
+        assert manager.max_memory_idle == 262144000
+
 
 def retry(func, max_time=60):
     """Simple test helper to retry a function until assertions no longer fail."""
