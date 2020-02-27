@@ -1,13 +1,12 @@
 # Monitor and control Apache web server workers from Python.
 #
 # Author: Peter Odding <peter@peterodding.com>
-# Last Change: February 26, 2020
+# Last Change: February 27, 2020
 # URL: https://apache-manager.readthedocs.io
 
 """The :mod:`apache_manager` module defines the core logic of the Apache manager."""
 
 # Standard library modules.
-import logging
 import os
 import re
 
@@ -38,6 +37,7 @@ from property_manager import (
 from six.moves.urllib.error import HTTPError
 from six.moves.urllib.request import urlopen
 from update_dotdee import ConfigLoader
+from verboselogs import VerboseLogger
 
 # Modules included in our package.
 from apache_manager.exceptions import AddressDiscoveryError, StatusPageError
@@ -103,7 +103,7 @@ number). Refer to :attr:`ApacheManager.hanging_workers`.
 """
 
 # Initialize a logger for this module.
-logger = logging.getLogger(__name__)
+logger = VerboseLogger(__name__)
 
 
 class ApacheManager(PropertyManager):
@@ -726,14 +726,18 @@ class ApacheManager(PropertyManager):
                 kill_worker = False
                 memory_usage_threshold = max_memory_active if worker.is_active else max_memory_idle
                 if memory_usage_threshold and worker.memory_usage > memory_usage_threshold:
-                    logger.info("Killing %s using %s (%s) ..",
-                                worker, format_size(worker.memory_usage),
-                                worker.request or 'last request unknown')
+                    logger.notice(
+                        "Killing %s using %s (%s) ..",
+                        worker, format_size(worker.memory_usage),
+                        worker.request or 'last request unknown',
+                    )
                     kill_worker = True
                 elif timeout and worker.is_active and getattr(worker, 'ss', 0) > timeout:
-                    logger.info("Killing %s hanging for %s since last request (%s) ..",
-                                worker, format_timespan(worker.ss),
-                                worker.request or 'unknown')
+                    logger.notice(
+                        "Killing %s hanging for %s since last request (%s) ..",
+                        worker, format_timespan(worker.ss),
+                        worker.request or 'unknown',
+                    )
                     kill_worker = True
                 if kill_worker:
                     if not dry_run:
@@ -745,7 +749,7 @@ class ApacheManager(PropertyManager):
                         self.num_killed_idle += 1
             num_checked += 1
         if killed:
-            logger.info("Killed %i of %s.", len(killed), pluralize(num_checked, "Apache worker"))
+            logger.notice("Killed %i of %s.", len(killed), pluralize(num_checked, "Apache worker"))
         else:
             logger.info("No Apache workers killed (found %s within resource usage limits).",
                         pluralize(num_checked, "worker"))
