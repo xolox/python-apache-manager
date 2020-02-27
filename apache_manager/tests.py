@@ -1,7 +1,7 @@
 # Monitor and control Apache web server workers from Python.
 #
 # Author: Peter Odding <peter@peterodding.com>
-# Last Change: February 26, 2020
+# Last Change: February 27, 2020
 # URL: https://apache-manager.readthedocs.io
 
 """Test suite for the `apache-manager` project."""
@@ -273,8 +273,7 @@ class ApacheManagerTestCase(unittest.TestCase):
     def test_kill_active_worker(self):
         """Test killing of active workers based on memory usage thresholds."""
         if os.getuid() != 0:
-            logger.warning("Skipping test that kills active workers (superuser privileges are required)")
-            return
+            self.skipTest("Skipping test that kills active workers (superuser privileges are required)")
         with TemporaryWSGIApp('wsgi-memory-hog') as context:
 
             # Create a WSGI application that keeps allocating memory but never returns.
@@ -330,8 +329,7 @@ class ApacheManagerTestCase(unittest.TestCase):
     def test_kill_worker_that_times_out(self):
         """Test killing of active workers based on time usage thresholds."""
         if os.getuid() != 0:
-            logger.warning("Skipping test that kills workers that time out (superuser privileges are required)")
-            return
+            self.skipTest("Skipping test that kills workers that time out (superuser privileges are required)")
         with TemporaryWSGIApp('wsgi-timeout') as context:
 
             # Create a WSGI application that doesn't allocate too much memory but never returns.
