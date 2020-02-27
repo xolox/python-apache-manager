@@ -11,6 +11,30 @@ to `semantic versioning`_.
 .. _Keep a Changelog: http://keepachangelog.com/
 .. _semantic versioning: http://semver.org/
 
+`Release 2.1`_ (2020-02-27)
+---------------------------
+
+This release changes how logging is done:
+
+- When workers are killed this is now logged at the custom level ``NOTICE``
+  where previously the level ``INFO`` was used (``NOTICE`` sits between
+  ``INFO`` and ``WARNING``). The custom log level is implemented by
+  :pypi:`verboselogs`.
+
+- System logging has been reduced so that only killed workers, warnings and
+  errors are logged. This is because when ``apache-manager`` is being run from
+  a high frequency cron job it shouldn't spam the system logs.
+
+Additionally some changes were made to the test suite:
+
+- Use proper skipping so that :pypi:`pytest` is aware of skipped tests.
+
+- Use :pypi:`pytest-rerunfailures` to automate high level retrying of failed
+  tests (duct taping away flaky tests). I'd love to make the test suite more
+  robust in the near future but lack the time to do so now.
+
+.. _Release 2.1: https://github.com/xolox/python-apache-manager/compare/2.0...2.1
+
 `Release 2.0`_ (2020-02-26)
 ---------------------------
 

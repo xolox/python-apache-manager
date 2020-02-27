@@ -43,7 +43,7 @@ from verboselogs import VerboseLogger
 from apache_manager.exceptions import AddressDiscoveryError, StatusPageError
 
 # Semi-standard module versioning.
-__version__ = '2.0'
+__version__ = '2.1'
 
 # Hide internal identifiers from API documentation.
 __all__ = (
