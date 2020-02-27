@@ -1,7 +1,7 @@
 # Monitor and control Apache web server workers from Python.
 #
 # Author: Peter Odding <peter@peterodding.com>
-# Last Change: February 26, 2020
+# Last Change: February 27, 2020
 # URL: https://apache-manager.readthedocs.io
 
 """
@@ -112,7 +112,7 @@ logger = logging.getLogger(__name__)
 def main():
     """Command line interface for the ``apache-manager`` program."""
     # Configure logging output.
-    coloredlogs.install(syslog=True)
+    coloredlogs.install(syslog='notice')
     # Command line option defaults.
     actions = set()
     kw = dict()
