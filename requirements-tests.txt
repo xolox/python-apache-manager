@@ -4,3 +4,4 @@ executor >= 15.1
 naturalsort >= 1.5.1
 pytest >= 3.0.4
 pytest-cov >= 2.4.0
+pytest-rerunfailures >= 8.0
