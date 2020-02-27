@@ -118,7 +118,6 @@ def main():
     kw = dict()
     data_file = '/tmp/apache-manager.txt'
     dry_run = False
-    verbosity = 0
     # Parse the command line options.
     try:
         options, arguments = getopt.getopt(sys.argv[1:], 'ckwa:i:t:T:f:znvqh', [
@@ -151,10 +150,8 @@ def main():
                 dry_run = True
             elif option in ('-v', '--verbose'):
                 coloredlogs.increase_verbosity()
-                verbosity += 1
             elif option in ('-q', '--quiet'):
                 coloredlogs.decrease_verbosity()
-                verbosity -= 1
             elif option in ('-h', '--help'):
                 usage(__doc__)
                 return
