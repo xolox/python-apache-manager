@@ -421,6 +421,11 @@ class ApacheManagerTestCase(unittest.TestCase):
             output = execute('apache-manager', option, capture=True)
             assert "Usage:" in output
 
+    def test_main_module(self):
+        """Test that ``python -m apache_manager`` works."""
+        output = execute(sys.executable, '-m', 'apache_manager', '--help', capture=True)
+        assert "Usage:" in output
+
     def test_coerce_value(self):
         """Test value coercion."""
         # Test the happy path.

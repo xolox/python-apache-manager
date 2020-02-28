@@ -13,6 +13,12 @@ the `apache-manager` package. The following modules are available:
 .. automodule:: apache_manager
    :members:
 
+:mod:`apache_manager.__main__`
+------------------------------
+
+.. automodule:: apache_manager.__main__
+   :members:
+
 :mod:`apache_manager.cli`
 -------------------------
 
