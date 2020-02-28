@@ -1,7 +1,7 @@
 # Monitor and control Apache web server workers from Python.
 #
 # Author: Peter Odding <peter@peterodding.com>
-# Last Change: February 27, 2020
+# Last Change: February 28, 2020
 # URL: https://apache-manager.readthedocs.io
 
 """Test suite for the `apache-manager` project."""
@@ -414,6 +414,12 @@ class ApacheManagerTestCase(unittest.TestCase):
         assert exit_code == 0
         expected_tokens = ['uptime', 'workers-killed-active', 'workers-killed-idle']
         assert all(t in output.split() for t in expected_tokens)
+
+    def test_usage_message(self):
+        """Test the ``-h`` and ``--help`` options."""
+        for option in '-h', '--help':
+            output = execute('apache-manager', option, capture=True)
+            assert "Usage:" in output
 
     def test_coerce_value(self):
         """Test value coercion."""
