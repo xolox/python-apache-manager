@@ -1,7 +1,7 @@
 # Monitor and control Apache web server workers from Python.
 #
 # Author: Peter Odding <peter@peterodding.com>
-# Last Change: February 27, 2020
+# Last Change: February 28, 2020
 # URL: https://apache-manager.readthedocs.io
 
 """The :mod:`apache_manager` module defines the core logic of the Apache manager."""
@@ -43,7 +43,7 @@ from verboselogs import VerboseLogger
 from apache_manager.exceptions import AddressDiscoveryError, StatusPageError
 
 # Semi-standard module versioning.
-__version__ = '2.1'
+__version__ = '2.2'
 
 # Hide internal identifiers from API documentation.
 __all__ = (

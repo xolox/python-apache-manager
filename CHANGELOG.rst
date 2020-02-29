@@ -11,6 +11,17 @@ to `semantic versioning`_.
 .. _Keep a Changelog: http://keepachangelog.com/
 .. _semantic versioning: http://semver.org/
 
+`Release 2.2`_ (2020-02-29)
+---------------------------
+
+- Make the command line interface compatible with the ``python -m
+  apache_manager …`` command.
+
+- Added :ref:`Zabbix integration for apache-manager` to the online
+  documentation.
+
+.. _Release 2.2: https://github.com/xolox/python-apache-manager/compare/2.1...2.2
+
 `Release 2.1`_ (2020-02-27)
 ---------------------------
 
