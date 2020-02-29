@@ -147,25 +147,23 @@ Additionally some changes were made to the test suite:
 `Release 1.0`_ (2017-02-15)
 ---------------------------
 
-- Refactor ``WorkerStatus`` class to properly use property-manager_.
+- Refactor ``WorkerStatus`` class to properly use :pypi:`property-manager`.
 
   Strictly speaking this change set breaks backwards compatibility, however 99%
   percent of the functionality is the same, I've mostly just changed a whole
   lot of undocumented implementation details. Nevertheless I'm bumping the
   major version number because "explicit is better than implicit".
 
-- Use six_ instead of homegrown ``apache_manager.compat`` module.
+- Use :pypi:`six` instead of homegrown ``apache_manager.compat`` module.
 
-  Six_ was already included in the transitive requirements via executor_ so
-  there was really no point in not using it 🙂.
+  Six was already included in the transitive requirements via :pypi:`executor`
+  so there was really no point in not using it 🙂.
 
 - Refactor makefile & setup script (checkers, docs, wheels, twine, etc).
 
 - Improve test coverage of port discovery
 
 .. _Release 1.0: https://github.com/xolox/python-apache-manager/compare/0.6...1.0
-.. _six: https://pypi.org/project/six/
-.. _executor: https://pypi.org/project/executor/
 
 `Release 0.6`_ (2016-05-27)
 ---------------------------
@@ -199,11 +197,9 @@ much a bug fix but definitely a quality boost).
 `Release 0.2`_ (2015-10-04)
 ---------------------------
 
-Internal refactoring: Switch from cached-property_ to property-manager_.
+Internal refactoring: Switch from :pypi:`cached-property` to :pypi:`property-manager`.
 
 .. _Release 0.2: https://github.com/xolox/python-apache-manager/compare/0.1.1...0.2
-.. _cached-property: https://pypi.org/project/cached-property/
-.. _property-manager: https://pypi.org/project/property-manager/
 
 `Release 0.1.1`_ (2015-09-27)
 -----------------------------
