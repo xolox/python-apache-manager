@@ -1,7 +1,7 @@
 apache-manager: Monitor and control Apache web server workers from Python
 =========================================================================
 
-Welcome to the documentation of `apache-manager` version |release|!
+Welcome to the documentation of apache-manager version |release|!
 The following sections are available:
 
 .. contents::
@@ -15,6 +15,12 @@ documents the command line interface:
 
 .. toctree::
    readme.rst
+
+The following document explains how to integrate apache-manager with the Zabbix
+monitoring system:
+
+.. toctree::
+   zabbix.rst
 
 API documentation
 -----------------

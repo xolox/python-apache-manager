@@ -1,0 +1,49 @@
+/* Tweak the styling of inline preformatted text. */
+code.literal {
+  background-color: #eee;
+  border-radius: 0.25em;
+  border: 1px solid #ddd;
+  padding: 0.1em 0.2em;
+}
+
+/* Undo the above tweaks for preformatted text in headings and references. */
+h1 code,
+h2 code,
+h3 code,
+h4 code,
+h5 code,
+h6 code,
+code.literal.xref {
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+/* Use bold font for definition list terms. */
+dl dt {
+  font-weight: bold;
+}
+
+/* Undo the above for API documentation fragments. */
+dl.class dt,
+dl.data dt,
+dl.exception dt,
+dl.function dt {
+  font-weight: normal;
+}
+
+.section li {
+  margin-bottom: 0.75em;
+}
+
+div.contents {
+  padding: 0.5em;
+}
+
+.contents ul,
+.contents li,
+.contents p,
+.toctree-wrapper ul,
+.toctree-wrapper li {
+  margin: 0;
+}

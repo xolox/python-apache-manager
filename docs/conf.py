@@ -80,6 +80,16 @@ intersphinx_mapping = {
 
 # -- Options for HTML output ---------------------------------------------------
 
+# Add any paths that contain custom static files (such as style sheets) here,
+# relative to this directory. They are copied after the built-in static files,
+# so a file named "default.css" will overwrite the built-in "default.css".
+html_static_path = ["static"]
+
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 html_theme = 'nature'
+
+
+def setup(app):
+    """Entry point for Sphinx customizations."""
+    app.add_stylesheet("customizations.css")
